@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { Calendar, ChevronDown } from 'lucide-react';
 import LogsContent from './Logs';
+import LiveCamsContent from './LiveCamsContent';
+import ReportsContent from './Report';
 
 const optionsWaktu = ['Today', 'Weekly', 'Monthly'];
 const optionsShift = ['All', 'Morning', 'Afternoon', 'Night'];
@@ -97,7 +99,7 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar}) => {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="bg-[#f0f4f9] rounded-xl border border-[#003f98] p-6 shadow-sm flex flex-col">
           <h3 className="text-[22px] font-bold text-[#003f98] mb-6">Violation by Time</h3>
-          <div className="relative flex-1 bg-[#e6ecf5] rounded-xl p-4 min-h-[300px]">
+          <div className="relative flex-1 bg-[#e6ecf5] rounded-xl p-4 min-h-75">
             <div className="absolute left-4 top-6 bottom-10 flex flex-col justify-between text-[11px] text-[#6b90c3] font-medium">
               <span>25</span>
               <span>20</span>
@@ -121,7 +123,7 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar}) => {
                 })}
               </svg>
 
-              <div className="absolute bottom-[-10px] left-0 w-full flex justify-between text-[11px] text-[#6b90c3] font-medium px-2">
+              <div className="-bottom-2.5 absolute left-0 flex w-full justify-between px-2 text-[11px] font-medium text-[#6b90c3]">
                 {selectedData.lineLabels.map((label, i) => (
                   <span key={i}>{label}</span>
                 ))}
@@ -132,7 +134,7 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar}) => {
 
         <div className="bg-[#f0f4f9] rounded-xl border border-[#003f98] p-6 shadow-sm flex flex-col">
           <h3 className="text-[22px] font-bold text-[#003f98] mb-6">Violation by Type</h3>
-          <div className="relative flex-1 bg-[#e6ecf5] rounded-xl p-4 min-h-[300px]">
+          <div className="relative flex-1 bg-[#e6ecf5] rounded-xl p-4 min-h-75">
             <div className="absolute left-4 top-6 bottom-10 flex flex-col justify-between text-[11px] text-[#6b90c3] font-medium z-10">
               <span>25</span>
               <span>20</span>
@@ -179,6 +181,18 @@ const DashboardPetugasHSE = ({ onLogout }) => {
   const [waktu, setWaktu] = useState('Today');
   const [shift, setShift] = useState('All');
   const [area, setArea] = useState('All');
+  const [reportDraft, setReportDraft] = useState({
+    startDate: '2026-03-27',
+    endDate: '2026-03-27',
+    shift: 'Morning (08:00 - 16:00)',
+    area: 'Area 1 - Packing',
+  });
+  const [reportApplied, setReportApplied] = useState({
+    startDate: '2026-03-27',
+    endDate: '2026-03-27',
+    shift: 'Morning (08:00 - 16:00)',
+    area: 'Area 1 - Packing',
+  });
 
   const selectedData = dataByPeriod[waktu];
 
@@ -190,26 +204,27 @@ const DashboardPetugasHSE = ({ onLogout }) => {
   const maxBar = Math.max(...selectedData.barValues, 25);
   const showTimeAndShiftFilters = activeMenu !== 'Live Cams';
 
+  const handleGenerateReport = () => {
+    setReportApplied({ ...reportDraft });
+  };
+
   const renderMainContent = () => {
     if (activeMenu === 'Logs') {
       return <LogsContent />;
     }
 
     if (activeMenu === 'Live Cams') {
-      return (
-        <section className="bg-[#f0f4f9] rounded-xl border border-[#003f98] p-6 shadow-sm">
-          <h2 className="text-[28px] font-bold text-[#003f98]">Live Cams - All</h2>
-          <p className="mt-2 text-[#003f98]">The live camera page will be connected to the CCTV stream.</p>
-        </section>
-      );
+      return <LiveCamsContent />;
     }
 
     if (activeMenu === 'Reports') {
       return (
-        <section className="bg-[#f0f4f9] rounded-xl border border-[#003f98] p-6 shadow-sm">
-          <h2 className="text-[28px] font-bold text-[#003f98]">Reports</h2>
-          <p className="mt-2 text-[#003f98]">The reports page will show PPE summary by selected period.</p>
-        </section>
+        <ReportsContent
+          filterStartDate={reportApplied.startDate}
+          filterEndDate={reportApplied.endDate}
+          filterShift={reportApplied.shift}
+          filterArea={reportApplied.area}
+        />
       );
     }
 
@@ -227,7 +242,7 @@ const DashboardPetugasHSE = ({ onLogout }) => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#f0f3f8] font-sans text-[#00265d]">
-      <aside className="sticky top-0 h-screen w-[280px] shrink-0 bg-[#003f98] text-white flex flex-col px-6 py-8 shadow-xl z-10">
+      <aside className="sticky top-0 z-10 flex h-screen w-70 shrink-0 flex-col bg-[#003f98] px-6 py-8 text-white shadow-xl">
         <div className="flex items-center gap-4 mb-8">
           <div className="w-14 h-14 rounded-full bg-gray-300 overflow-hidden border-2 border-white/20">
             <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="Profile" className="w-full h-full object-cover" />
@@ -239,85 +254,159 @@ const DashboardPetugasHSE = ({ onLogout }) => {
           </div>
         </div>
 
-        <div className="h-px w-full bg-white/20 mb-6" />
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto scroll-smooth pr-1">
+          <div className="mb-6 h-px w-full bg-white/20" />
 
-        <nav className="flex flex-col gap-5 text-base mb-8">
-          {['Dashboard', 'Live Cams', 'Reports', 'Logs'].map((menu) => {
-            const isActive = activeMenu === menu;
-            return (
-              <button
-                key={menu}
-                type="button"
-                onClick={() => setActiveMenu(menu)}
-                className={`text-left cursor-pointer ${
-                  isActive ? 'font-bold text-white' : 'text-white/80 hover:text-white'
-                }`}
-              >
-                {menu}
-              </button>
-            );
-          })}
-        </nav>
+          <nav className="mb-8 flex flex-col gap-5 text-base">
+            {['Dashboard', 'Live Cams', 'Reports', 'Logs'].map((menu) => {
+              const isActive = activeMenu === menu;
+              return (
+                <button
+                  key={menu}
+                  type="button"
+                  onClick={() => setActiveMenu(menu)}
+                  className={`cursor-pointer text-left ${
+                    isActive ? 'font-bold text-white' : 'text-white/80 hover:text-white'
+                  }`}
+                >
+                  {menu}
+                </button>
+              );
+            })}
+          </nav>
 
-        <div className="h-px w-full bg-white/20 mb-6" />
-
-        <div className="flex flex-col gap-4 mb-auto">
-          {showTimeAndShiftFilters ? (
-            <>
-              <div>
-                <label className="block text-sm text-white/90 mb-1">Time</label>
-                <div className="relative">
-                  <select
-                    value={waktu}
-                    onChange={(event) => setWaktu(event.target.value)}
-                    className="w-full h-10 appearance-none bg-transparent border border-white/30 rounded-md px-3 text-white focus:outline-none focus:border-white cursor-pointer"
-                  >
-                    {optionsWaktu.map((option) => (
-                      <option key={option} value={option} className="text-black">{option}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-2.5 h-5 w-5 text-white pointer-events-none" />
+          {activeMenu === 'Reports' ? (
+            <div className="mb-6 border-y border-white/20 py-4">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">Start Date</label>
+                  <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
+                    <Calendar className="h-4 w-4 shrink-0 text-white" />
+                    <input
+                      type="date"
+                      value={reportDraft.startDate}
+                      onChange={(event) => setReportDraft((prev) => ({ ...prev, startDate: event.target.value }))}
+                      className="scheme-dark w-full bg-transparent text-sm text-white outline-none"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm text-white/90 mb-1">Shift</label>
-                <div className="relative">
-                  <select
-                    value={shift}
-                    onChange={(event) => setShift(event.target.value)}
-                    className="w-full h-10 appearance-none bg-transparent border border-white/30 rounded-md px-3 text-white focus:outline-none focus:border-white cursor-pointer"
-                  >
-                    {optionsShift.map((option) => (
-                      <option key={option} value={option} className="text-black">{option}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-2.5 h-5 w-5 text-white pointer-events-none" />
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">End Date</label>
+                  <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
+                    <Calendar className="h-4 w-4 shrink-0 text-white" />
+                    <input
+                      type="date"
+                      value={reportDraft.endDate}
+                      onChange={(event) => setReportDraft((prev) => ({ ...prev, endDate: event.target.value }))}
+                      className="scheme-dark w-full bg-transparent text-sm text-white outline-none"
+                    />
+                  </div>
                 </div>
-              </div>
-            </>
-          ) : null}
 
-          <div>
-            <label className="block text-sm text-white/90 mb-1">Area</label>
-            <div className="relative">
-              <select
-                value={area}
-                onChange={(event) => setArea(event.target.value)}
-                className="w-full h-10 appearance-none bg-transparent border border-white/30 rounded-md px-3 text-white focus:outline-none focus:border-white cursor-pointer"
-              >
-                {optionsArea.map((option) => (
-                  <option key={option} value={option} className="text-black">{option}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-2.5 h-5 w-5 text-white pointer-events-none" />
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">Shift</label>
+                  <div className="relative">
+                    <select
+                      value={reportDraft.shift}
+                      onChange={(event) => setReportDraft((prev) => ({ ...prev, shift: event.target.value }))}
+                      className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
+                    >
+                      <option value="Morning (08:00 - 16:00)" className="text-black">Morning (08:00 - 16:00)</option>
+                      <option value="Afternoon (16:00 - 00:00)" className="text-black">Afternoon (16:00 - 00:00)</option>
+                      <option value="Night (00:00 - 08:00)" className="text-black">Night (00:00 - 08:00)</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-white" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">Area</label>
+                  <div className="relative">
+                    <select
+                      value={reportDraft.area}
+                      onChange={(event) => setReportDraft((prev) => ({ ...prev, area: event.target.value }))}
+                      className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
+                    >
+                      <option value="Area 1 - Packing" className="text-black">Area 1 - Packing</option>
+                      <option value="Area 2 - Warehouse" className="text-black">Area 2 - Warehouse</option>
+                      <option value="Area 3 - Production" className="text-black">Area 3 - Production</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-white" />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateReport}
+                  className="mt-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-[#0f4aa1] hover:bg-white/90"
+                >
+                  Generate Report
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mb-6 border-y border-white/20 py-4">
+              <div className="flex flex-col gap-4">
+                {showTimeAndShiftFilters ? (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-sm text-white/90">Time</label>
+                      <div className="relative">
+                        <select
+                          value={waktu}
+                          onChange={(event) => setWaktu(event.target.value)}
+                          className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
+                        >
+                          {optionsWaktu.map((option) => (
+                            <option key={option} value={option} className="text-black">{option}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-white" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm text-white/90">Shift</label>
+                      <div className="relative">
+                        <select
+                          value={shift}
+                          onChange={(event) => setShift(event.target.value)}
+                          className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
+                        >
+                          {optionsShift.map((option) => (
+                            <option key={option} value={option} className="text-black">{option}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-white" />
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">Area</label>
+                  <div className="relative">
+                    <select
+                      value={area}
+                      onChange={(event) => setArea(event.target.value)}
+                      className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
+                    >
+                      {optionsArea.map((option) => (
+                        <option key={option} value={option} className="text-black">{option}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <button
           onClick={onLogout}
-          className="mt-8 border border-white/50 text-white rounded-md py-2 px-4 hover:bg-white/10 transition-colors w-[100px] text-sm text-center"
+          className="mt-8 w-25 rounded-md border border-white/50 px-4 py-2 text-center text-sm text-white transition-colors hover:bg-white/10"
         >
           Log Out
         </button>
