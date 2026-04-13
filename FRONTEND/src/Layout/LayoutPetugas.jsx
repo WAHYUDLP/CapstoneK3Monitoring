@@ -23,9 +23,9 @@ const LayoutPetugas = ({
   onLogout,
   activeMenu = 'Dashboard',
   onMenuSelect,
-  userName = 'Petugas HSE',
-  dateText = 'Jumat, 27 Maret 2026',
-  topbarTitle = 'Dashboard Petugas HSE',
+  userName = 'HSE Officer',
+  dateText = 'Friday, 27 March 2026',
+  topbarTitle = 'HSE Officer Dashboard',
   sidebarContent,
 }) => {
   const [isConfigOpen, setIsConfigOpen] = useState(true)
@@ -74,7 +74,7 @@ const LayoutPetugas = ({
             >
               <span className="inline-flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4" />
-                Konfigurasi
+                Configuration
               </span>
               <ChevronDown className={`h-4 w-4 transition-transform ${isConfigOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -85,15 +85,15 @@ const LayoutPetugas = ({
                   <>
                     <div>
                       <label htmlFor="dummy-camera" className="mb-1 block text-sm text-white/90">
-                        Kamera
+                        Camera
                       </label>
                       <select
                         id="dummy-camera"
                         className="h-10 w-full appearance-none rounded-lg border border-white/40 bg-[#0f4aa1] px-3 text-white focus:outline-none focus:ring-2 focus:ring-white/60"
                       >
-                        <option className="text-black">Semua Kamera</option>
-                        <option className="text-black">Kamera Area A</option>
-                        <option className="text-black">Kamera Area B</option>
+                        <option className="text-black">All Cameras</option>
+                        <option className="text-black">Camera Area A</option>
+                        <option className="text-black">Camera Area B</option>
                       </select>
                     </div>
 
@@ -105,23 +105,23 @@ const LayoutPetugas = ({
                         id="dummy-alert"
                         className="h-10 w-full appearance-none rounded-lg border border-white/40 bg-[#0f4aa1] px-3 text-white focus:outline-none focus:ring-2 focus:ring-white/60"
                       >
-                        <option className="text-black">Semua Alert</option>
-                        <option className="text-black">Prioritas Tinggi</option>
-                        <option className="text-black">Prioritas Rendah</option>
+                        <option className="text-black">All Alerts</option>
+                        <option className="text-black">High Priority</option>
+                        <option className="text-black">Low Priority</option>
                       </select>
                     </div>
 
                     <div>
                       <label htmlFor="dummy-report" className="mb-1 block text-sm text-white/90">
-                        Tipe Report
+                        Report Type
                       </label>
                       <select
                         id="dummy-report"
                         className="h-10 w-full appearance-none rounded-lg border border-white/40 bg-[#0f4aa1] px-3 text-white focus:outline-none focus:ring-2 focus:ring-white/60"
                       >
-                        <option className="text-black">Harian</option>
-                        <option className="text-black">Mingguan</option>
-                        <option className="text-black">Bulanan</option>
+                        <option className="text-black">Daily</option>
+                        <option className="text-black">Weekly</option>
+                        <option className="text-black">Monthly</option>
                       </select>
                     </div>
                   </>
@@ -149,7 +149,7 @@ const LayoutPetugas = ({
             <div className="flex items-center gap-3 text-[#0f4aa1]">
               <div className="hidden items-center gap-2 rounded-full border border-[#0f4aa1]/40 px-3 py-1 text-sm sm:flex">
                 <Camera className="h-4 w-4" />
-                Kamera Online
+                Cameras Online
               </div>
               <button
                 type="button"

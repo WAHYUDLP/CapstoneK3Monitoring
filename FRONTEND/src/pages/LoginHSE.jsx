@@ -17,8 +17,8 @@ const LoginHSE = ({ onLoginSuccess }) => {
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    // Tempatkan integrasi API autentikasi di sini.
-    console.log('Mencoba login dengan:', formData)
+    // Place authentication API integration here.
+    console.log('Attempting login with:', formData)
     onLoginSuccess?.()
   }
 
@@ -36,7 +36,7 @@ const LoginHSE = ({ onLoginSuccess }) => {
               <ShieldAlert className="h-11 w-11 text-[#003f98]" />
             </div>
             <h1 className="text-2xl font-extrabold tracking-wide text-[#00265d]">MONITORING APD</h1>
-            <p className="mt-2 text-sm font-semibold text-[#6b90c3]">Portal Akses Admin &amp; Pekerja HSE</p>
+            <p className="mt-2 text-sm font-semibold text-[#6b90c3]">Admin &amp; HSE Worker Access Portal</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -55,7 +55,7 @@ const LoginHSE = ({ onLoginSuccess }) => {
                   value={formData.username}
                   onChange={handleChange}
                   className="block w-full rounded-lg border border-[#96b0d5] bg-slate-50 py-3 pl-10 pr-3 text-[#00265d] placeholder-[#96b0d5] transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#003f98]"
-                  placeholder="Masukkan username Anda"
+                  placeholder="Enter your username"
                   autoComplete="username"
                   required
                 />
@@ -77,7 +77,7 @@ const LoginHSE = ({ onLoginSuccess }) => {
                   value={formData.password}
                   onChange={handleChange}
                   className="block w-full rounded-lg border border-[#96b0d5] bg-slate-50 py-3 pl-10 pr-3 text-[#00265d] placeholder-[#96b0d5] transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#003f98]"
-                  placeholder="Masukkan password Anda"
+                  placeholder="Enter your password"
                   autoComplete="current-password"
                   required
                 />
@@ -88,16 +88,16 @@ const LoginHSE = ({ onLoginSuccess }) => {
               type="submit"
               className="mt-4 flex w-full justify-center rounded-lg bg-[#003f98] px-4 py-3 text-sm font-extrabold text-white shadow-md transition-colors duration-200 hover:bg-[#002c6a] focus:outline-none focus:ring-2 focus:ring-[#003f98] focus:ring-offset-2"
             >
-              Masuk ke Sistem
+              Sign In
             </button>
           </form>
 
           <div className="mt-8 border-t border-[#e6ecf5] pt-6 text-center">
             <div className="flex items-center justify-center gap-2 text-xs text-[#6b90c3]">
               <span className="h-2 w-2 animate-pulse rounded-full bg-[#65d738]" />
-              <span>Sistem Deteksi Kamera Aktif</span>
+              <span>Camera Detection System Active</span>
             </div>
-            <p className="mt-2 text-xs text-[#96b0d5]">Hanya untuk personel berwenang. Area Industri.</p>
+            <p className="mt-2 text-xs text-[#96b0d5]">Authorized personnel only. Industrial area.</p>
           </div>
         </div>
       </div>
