@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 import requests
 import time
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text # Digabung biar rapi
 from sqlalchemy.orm import sessionmaker
 from model import Violation, Base 
 
@@ -67,6 +67,7 @@ def send_to_telegram(data: ViolationData):
     except Exception as e:
         print(f"❌ ERROR API Telegram: {e}")
 
+# ENDPOINT UTAMA (Nerima Data dari AI)
 @app.post("/report-violation")
 async def report_violation(data: ViolationData, background_tasks: BackgroundTasks):
     # CEK ANTI SPAM
@@ -94,8 +95,30 @@ async def report_violation(data: ViolationData, background_tasks: BackgroundTask
         print(f"❌ Gagal simpan ke database: {e}")
     finally:
         db.close()
-
-    # KIRIM KE TELEGRAM 
+        
+    # KIRIM KE TELEGRAM (INI HARUSNYA DI SINI)
     background_tasks.add_task(send_to_telegram, data)
 
+    # BALESAN KE AI (INI JUGA HARUSNYA DI SINI)
     return {"status": "success", "message": "Data berhasil diproses Backend!"}
+
+# ENDPOINT HEALTH CHECK (Buat Dashboard Admin)
+@app.get("/ping")
+async def health_check():
+    db_status = "Disconnected ❌"
+    
+    try:
+        # Mencoba ngetuk pintu database
+        db = SessionLocal()
+        db.execute(text("SELECT 1")) 
+        db_status = "Connected ✅"
+        db.close()
+    except Exception as e:
+        print(f"Error DB Ping: {e}")
+        db_status = "Error Database"
+
+    return {
+        "status_server": "Online ✅",
+        "status_database": db_status,
+        "pesan": "Backend Sistem K3 Aktif dan Siap Menerima Data!"
+    }
