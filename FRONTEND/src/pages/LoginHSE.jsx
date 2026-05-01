@@ -15,12 +15,22 @@ const LoginHSE = ({ onLoginSuccess }) => {
     }))
   }
 
+  // const handleSubmit = (event) => {
+  //   event.preventDefault()
+  //   // Place authentication API integration here.
+  //   console.log('Attempting login with:', formData)
+  //   onLoginSuccess?.()
+  // }
+
   const handleSubmit = (event) => {
-    event.preventDefault()
-    // Place authentication API integration here.
-    console.log('Attempting login with:', formData)
-    onLoginSuccess?.()
+  event.preventDefault()
+
+  if (formData.username === "admin" && formData.password === "123") {
+    onLoginSuccess?.("admin") //khusus role atmin
+  } else {
+    onLoginSuccess?.("petugas") //lainnya
   }
+}
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#e6ecf5] px-4 py-8 sm:py-12">
