@@ -1,0 +1,15 @@
+# Folder environment Python 
+.venv/
+venv/
+env/
+
+# File cache Python
+__pycache__/
+*.pyc
+
+# Aplikasi pihak ketiga 
+ngrok.exe
+ngrok.zip
+
+# File rahasia eheheh
+.env
