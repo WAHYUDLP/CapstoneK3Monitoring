@@ -1,18 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { fetchViolations } from '../../api';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 
-// Mock data for reference layout
-const logsData = [
-  { id: 1, area: 'Area 1', date: '23/3/2026', time: '07:34:44', violation: 'PPE01', evidence: '202603230734441.jpg' },
-  { id: 2, area: 'Area 2', date: '23/3/2026', time: '07:36:21', violation: 'PPE02', evidence: '202603230736212.jpg' },
-  { id: 3, area: 'Area 2', date: '23/3/2026', time: '07:37:46', violation: 'PPE03', evidence: '202603230737462.jpg' },
-  { id: 4, area: 'Area 3', date: '23/3/2026', time: '09:56:14', violation: 'PPE02', evidence: '202603230956143.jpg' },
-  { id: 5, area: 'Area 2', date: '24/3/2026', time: '14:21:55', violation: 'PPE02', evidence: '202603241421552.jpg' },
-  { id: 6, area: 'Area 1', date: '23/3/2026', time: '07:34:44', violation: 'PPE01', evidence: '202603230734441.jpg' },
-  { id: 7, area: 'Area 2', date: '23/3/2026', time: '07:36:21', violation: 'PPE02', evidence: '202603230736212.jpg' },
-  { id: 8, area: 'Area 2', date: '23/3/2026', time: '07:37:46', violation: 'PPE03', evidence: '202603230737462.jpg' },
-  { id: 9, area: 'Area 3', date: '23/3/2026', time: '09:56:14', violation: 'PPE02', evidence: '202603230956143.jpg' },
-  { id: 10, area: 'Area 2', date: '24/3/2026', time: '14:21:55', violation: 'PPE02', evidence: '202603241421552.jpg' },
+// initial placeholder until API results arrive
+const initialMock = [
+  { id: 0, area: 'Area 1', date: '23/3/2026', time: '07:34:44', violation: 'PPE01', evidence: '202603230734441.jpg' },
 ];
 
 const pageSizeOptions = [10, 15, 20, 25];
@@ -20,6 +12,37 @@ const pageSizeOptions = [10, 15, 20, 25];
 const LogsContent = () => {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [logsData, setLogsData] = useState(initialMock);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const rows = await fetchViolations(200);
+      if (!mounted) return;
+      if (!rows || rows.length === 0) return;
+      const mapped = rows.map((r) => {
+        const dt = r.created_at ? new Date(r.created_at) : new Date();
+        const date = dt.toLocaleDateString('id-ID');
+        const time = dt.toLocaleTimeString('id-ID');
+        const evidenceName = r.image_path ? r.image_path.split('/').pop() : '';
+        const evidenceUrl = r.image_path || '';
+        return {
+          id: r.id,
+          area: r.camera_id || 'Unknown',
+          date,
+          time,
+          violationCode: r.violation_code || '-',
+          violationLabel: r.violation_label || r.violation_type || '-',
+          evidenceName,
+          evidenceUrl,
+        };
+      });
+      setLogsData(mapped);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const totalRows = logsData.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -28,7 +51,7 @@ const LogsContent = () => {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
     return logsData.slice(start, end);
-  }, [currentPage, pageSize]);
+  }, [currentPage, pageSize, logsData]);
 
   const startRow = totalRows === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRow = Math.min(currentPage * pageSize, totalRows);
@@ -100,16 +123,23 @@ const LogsContent = () => {
                   <td className="px-6 py-4 text-[14px] font-medium text-[#6b90c3]">{log.time}</td>
                   <td className="px-6 py-4">
                     {/* Violation badge */}
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[13px] font-semibold bg-[#e6ecf5] text-[#003f98] border border-[#c8d6ea]">
-                      {log.violation}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="inline-flex w-fit items-center px-2.5 py-1 rounded-md text-[13px] font-semibold bg-[#e6ecf5] text-[#003f98] border border-[#c8d6ea]">
+                        {log.violationCode}
+                      </span>
+                      <span className="mt-1 text-[12px] text-[#6b90c3]">
+                        {log.violationLabel}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
-                    <a 
-                      href={`#${log.evidence}`} 
+                    <a
+                      href={log.evidenceUrl || '#'}
+                      target={log.evidenceUrl ? '_blank' : undefined}
+                      rel={log.evidenceUrl ? 'noreferrer' : undefined}
                       className="text-[14px] font-semibold text-[#003f98] hover:text-[#002c6a] hover:underline underline-offset-4 transition-all flex items-center gap-1"
                     >
-                      {log.evidence}
+                      {log.evidenceName || '-'}
                     </a>
                   </td>
                 </tr>

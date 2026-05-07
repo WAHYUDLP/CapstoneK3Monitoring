@@ -1,63 +1,81 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, FileSearch } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import { fetchReportPdf, fetchViolationsFiltered } from '../../api';
 
 // Asumsinya props ini dikirim dari konfigurasi Sidebar
-const ReportsContent = ({ 
-  filterStartDate = '2026-03-27',
-  filterEndDate = '2026-03-27',
-  filterShift = 'Pagi (08:00 - 16:00)', 
-  filterArea = 'Area 1 - Packing',
+const ReportsContent = ({
+  filterStartDate = new Date().toISOString().slice(0, 10),
+  filterEndDate = new Date().toISOString().slice(0, 10),
+  filterShift = 'All',
+  filterArea = 'All',
 }) => {
-  
-  // Format tanggal ke gaya Indonesia (contoh: 27 Maret 2026)
+
   const formatDateLabel = (dateValue) => {
     if (!dateValue) return '';
-    const date = new Date(`${dateValue}T00:00:00`);
+    const [year, month, day] = dateValue.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
     return new Intl.DateTimeFormat('id-ID', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
+      timeZone: 'UTC',
     }).format(date);
   };
 
   const displayedDateRange = (() => {
     const startLabel = formatDateLabel(filterStartDate);
     const endLabel = formatDateLabel(filterEndDate);
-
     if (startLabel && endLabel && startLabel === endLabel) {
       return startLabel;
     }
-
     return `${startLabel} - ${endLabel}`;
   })();
 
-  const systemData = {
-    tanggal: displayedDateRange,
-    sifKerja: filterShift,
-    area: filterArea,
-    // Auto-generate tanggal hari ini dengan format Bahasa Indonesia
-    tanggalTerbit: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+  const formatShiftLabel = (value) => {
+    if (!value || value === 'All') return 'Semua Shift';
+    if (value.startsWith('Morning')) return 'Pagi (08:00 - 16:00)';
+    if (value.startsWith('Afternoon')) return 'Sore (16:00 - 00:00)';
+    if (value.startsWith('Night')) return 'Malam (00:00 - 08:00)';
+    return value;
   };
 
-  const initialLogs = useMemo(
-    () => [
-      { id: 1, waktu: '08:15:22', kode: 'PPE01', bukti: 'img_081522.jpg', tindakan: '' },
-      { id: 2, waktu: '10:30:10', kode: 'PPE02', bukti: 'img_103010.jpg', tindakan: '' },
-      { id: 3, waktu: '13:45:00', kode: 'PPE03', bukti: 'img_134500.jpg', tindakan: '' },
-    ],
-    [],
-  );
+  const formatAreaLabel = (value) => {
+    if (!value || value === 'All') return 'Semua Area';
+    return value;
+  };
+
+  const normalizeShift = (value) => {
+    if (!value) return 'All';
+    if (value.startsWith('Morning')) return 'Morning';
+    if (value.startsWith('Afternoon')) return 'Afternoon';
+    if (value.startsWith('Night')) return 'Night';
+    if (value === 'All') return 'All';
+    return value;
+  };
+
+  const systemData = {
+    tanggal: displayedDateRange,
+    sifKerja: formatShiftLabel(filterShift),
+    area: formatAreaLabel(filterArea),
+    tanggalTerbit: new Intl.DateTimeFormat('id-ID', { 
+      day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' 
+    }).format(new Date()),
+  };
+
+  const initialLogs = useMemo(() => [], []);
 
   // 1. STATE INPUT USER
   const [pengawas, setPengawas] = useState('');
-  const [cekSebelum, setCekSebelum] = useState(''); 
-  const [cekSelama, setCekSelama] = useState('');   
+  const [cekSebelum, setCekSebelum] = useState('');
+  const [cekSelama, setCekSelama] = useState('');
   const [catatan, setCatatan] = useState('');
   const [logs, setLogs] = useState(initialLogs);
   const [isHydrated, setIsHydrated] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(null);
+  
+  // STATE BARU: Untuk ngetrack apakah sedang menyimpan atau tidak
+  const [isSaving, setIsSaving] = useState(false); 
+
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [previewPdfUrl, setPreviewPdfUrl] = useState('');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -73,7 +91,6 @@ const ReportsContent = ({
   useEffect(() => {
     try {
       const rawData = localStorage.getItem(storageKey);
-
       if (rawData) {
         const parsed = JSON.parse(rawData);
         setPengawas(parsed.pengawas ?? '');
@@ -83,43 +100,82 @@ const ReportsContent = ({
         setLogs(parsed.logs ?? initialLogs);
         setLastSavedAt(parsed.savedAt ?? null);
       } else {
-        setPengawas('');
-        setCekSebelum('');
-        setCekSelama('');
-        setCatatan('');
-        setLogs(initialLogs);
-        setLastSavedAt(null);
+        setPengawas(''); setCekSebelum(''); setCekSelama(''); setCatatan(''); setLogs(initialLogs); setLastSavedAt(null);
       }
     } catch {
-      setPengawas('');
-      setCekSebelum('');
-      setCekSelama('');
-      setCatatan('');
-      setLogs(initialLogs);
-      setLastSavedAt(null);
+      setPengawas(''); setCekSebelum(''); setCekSelama(''); setCatatan(''); setLogs(initialLogs); setLastSavedAt(null);
     } finally {
       setIsHydrated(true);
     }
   }, [initialLogs, storageKey]);
 
   useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
+    let mounted = true;
+    (async () => {
+      const rows = await fetchViolationsFiltered({
+        startDate: filterStartDate,
+        endDate: filterEndDate,
+        shift: normalizeShift(filterShift),
+        area: filterArea,
+      });
+
+      if (!mounted) return;
+      if (!rows || rows.length === 0) {
+        setLogs([]);
+        return;
+      }
+
+      const sortedRows = [...rows].sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateA - dateB;
+      });
+
+      const mapped = sortedRows.map((r) => {
+        const dt = r.created_at ? new Date(r.created_at) : new Date();
+        
+        const dateStr = new Intl.DateTimeFormat('id-ID', {
+          day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Jakarta'
+        }).format(dt);
+
+        const timeStr = new Intl.DateTimeFormat('id-ID', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Jakarta', hour12: false
+        }).format(dt).replace(/:/g, '.');
+
+        const evidence = r.image_path ? r.image_path.split('/').pop() : '';
+        return {
+          id: r.id,
+          tanggal: dateStr,
+          waktu: timeStr,
+          kode: r.violation_code || '-',
+          label: r.violation_label || r.violation_type || '-',
+          bukti: evidence,
+          tindakan: '',
+        };
+      });
+      setLogs(mapped);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [filterStartDate, filterEndDate, filterShift, filterArea]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    // Pas mulai ngetik, kita set indikator "Menyimpan..."
+    setIsSaving(true);
 
     const timer = setTimeout(() => {
-      const savedAt = new Date().toISOString();
-      const payload = {
-        pengawas,
-        cekSebelum,
-        cekSelama,
-        catatan,
-        logs,
-        savedAt,
-      };
+      const savedAt = "saved"; 
+      const payload = { pengawas, cekSebelum, cekSelama, catatan, logs, savedAt };
       localStorage.setItem(storageKey, JSON.stringify(payload));
       setLastSavedAt(savedAt);
-    }, 350);
+      
+      // Pas selesai disimpan (setelah delay berenti ngetik), matikan indikator muter-muter
+      setIsSaving(false);
+    }, 500); // Waktu delaynya aku bikin 500ms biar animasinya sempat keliatan jelas
 
     return () => clearTimeout(timer);
   }, [isHydrated, pengawas, cekSebelum, cekSelama, catatan, logs, storageKey]);
@@ -132,54 +188,35 @@ const ReportsContent = ({
     };
   }, [previewPdfUrl]);
 
-  const buildPdf = async () => {
-    if (!reportPaperRef.current) {
-      throw new Error('Report element is not ready.');
-    }
+  const buildPdfBlob = async () => {
+    const tindakanMap = logs.reduce((acc, log) => {
+      if (log.tindakan) {
+        acc[String(log.id)] = log.tindakan;
+      }
+      return acc;
+    }, {});
 
-    const canvas = await html2canvas(reportPaperRef.current, {
-      scale: 1.5,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      scrollY: -window.scrollY,
-      windowWidth: reportPaperRef.current.scrollWidth,
-      windowHeight: reportPaperRef.current.scrollHeight,
+    return await fetchReportPdf({
+      start_date: filterStartDate,
+      end_date: filterEndDate,
+      shift: normalizeShift(filterShift),
+      area: filterArea,
+      pengawas,
+      cek_sebelum: cekSebelum,
+      cek_selama: cekSelama,
+      catatan,
+      tindakan_map: tindakanMap,
     });
-
-    const imageData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imageWidth = pageWidth;
-    const imageHeight = (canvas.height * imageWidth) / canvas.width;
-
-    let remainingHeight = imageHeight;
-    let position = 0;
-
-    pdf.addImage(imageData, 'PNG', 0, position, imageWidth, imageHeight, undefined, 'FAST');
-    remainingHeight -= pageHeight;
-
-    while (remainingHeight > 0) {
-      position = remainingHeight - imageHeight;
-      pdf.addPage();
-      pdf.addImage(imageData, 'PNG', 0, position, imageWidth, imageHeight, undefined, 'FAST');
-      remainingHeight -= pageHeight;
-    }
-
-    return pdf;
   };
 
   const handlePreviewPdf = async () => {
     try {
       setIsGeneratingPdf(true);
-      const pdf = await buildPdf();
-      const blob = pdf.output('blob');
+      const blob = await buildPdfBlob();
+      if (!blob) throw new Error('PDF tidak tersedia');
       const blobUrl = URL.createObjectURL(blob);
-
       setPreviewPdfUrl((previousUrl) => {
-        if (previousUrl) {
-          URL.revokeObjectURL(previousUrl);
-        }
+        if (previousUrl) URL.revokeObjectURL(previousUrl);
         return blobUrl;
       });
       setIsPreviewOpen(true);
@@ -194,9 +231,7 @@ const ReportsContent = ({
   const handleClosePreview = () => {
     setIsPreviewOpen(false);
     setPreviewPdfUrl((previousUrl) => {
-      if (previousUrl) {
-        URL.revokeObjectURL(previousUrl);
-      }
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
       return '';
     });
   };
@@ -204,9 +239,9 @@ const ReportsContent = ({
   const handleDownloadPdf = async () => {
     try {
       setIsGeneratingPdf(true);
-      const pdf = await buildPdf();
+      const blob = await buildPdfBlob();
+      if (!blob) throw new Error('PDF tidak tersedia');
       const fileName = `laporan-k3-${filterStartDate}-sampai-${filterEndDate}.pdf`;
-      const blob = pdf.output('blob');
       const downloadUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
@@ -223,21 +258,36 @@ const ReportsContent = ({
     }
   };
 
-  // Minimal baris di tabel agar tidak terlihat kosong jika data sedikit
   const MINIMUM_ROWS = 5;
   const emptyRowsNeeded = Math.max(0, MINIMUM_ROWS - logs.length);
 
   return (
     <div className="h-full min-h-0 overflow-y-auto font-sans">
-      
       {/* Tombol Aksi */}
       <div className="mx-auto mb-6 flex w-full max-w-4xl items-center justify-end gap-3 print:hidden">
-        <span className="mr-auto text-xs font-medium text-[#6b90c3]">
-          {lastSavedAt
-            ? `Auto-saved ${new Date(lastSavedAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`
-            : 'Belum ada perubahan tersimpan'}
+        
+        {/* LOGIKA AUTO-SAVE MENGGUNAKAN ANIMASI SPINNER */}
+        <span className="mr-auto flex items-center gap-2 text-xs font-medium text-[#6b90c3] transition-all">
+          {isSaving ? (
+            <>
+              {/* Ini SVG Lingkaran Spinner */}
+              <svg className="h-4 w-4 animate-spin text-[#6b90c3]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Menyimpan...
+            </>
+          ) : lastSavedAt ? (
+            <span className="flex items-center gap-1.5">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#65d738]/20 text-[#65d738]">✔</span> 
+              Tersimpan
+            </span>
+          ) : (
+            'Belum ada perubahan'
+          )}
         </span>
-        <button 
+
+        <button
           type="button"
           onClick={handlePreviewPdf}
           disabled={isGeneratingPdf}
@@ -245,7 +295,7 @@ const ReportsContent = ({
         >
           <FileSearch className="w-4 h-4" /> {isGeneratingPdf ? 'Membuat PDF...' : 'Preview PDF'}
         </button>
-        <button 
+        <button
           type="button"
           onClick={handleDownloadPdf}
           disabled={isGeneratingPdf}
@@ -256,8 +306,11 @@ const ReportsContent = ({
       </div>
 
       {/* Kertas Laporan */}
-      <div ref={reportPaperRef} className="relative mx-auto w-full max-w-4xl bg-white p-8 text-black shadow-2xl min-h-264 md:p-14 print:m-0 print:max-w-none print:p-0 print:shadow-none print:w-full">
-        
+      <div
+        ref={reportPaperRef}
+        className="relative mx-auto w-full max-w-4xl bg-white p-8 text-black shadow-2xl min-h-264 md:p-14 print:m-0 print:max-w-none print:p-0 print:shadow-none print:w-full"
+        style={{ width: '210mm', maxWidth: '100%', minHeight: '297mm' }}
+      >
         {/* HEADER */}
         <div className="flex items-center gap-6 mb-4">
           <h1 className="text-[44px] font-bold text-[#003399] tracking-wider leading-none">EPSON</h1>
@@ -274,26 +327,26 @@ const ReportsContent = ({
           <div className="flex"><span className="w-28">Tanggal</span><span>: {systemData.tanggal}</span></div>
           <div className="flex"><span className="w-32">Tanggal Terbit</span><span>: {systemData.tanggalTerbit}</span></div>
           <div className="flex"><span className="w-28">Shift Kerja</span><span>: {systemData.sifKerja}</span></div>
-          
+
           <div className="flex items-center">
             <span className="w-32">Pengawas</span>
             <span>:</span>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={pengawas}
               onChange={(e) => setPengawas(e.target.value)}
-              placeholder="[Isi nama pengawas]" 
+              placeholder="[Isi nama pengawas]"
               className="ml-2 flex-1 border-b border-[#d1d5db] focus:border-black focus:outline-none bg-transparent placeholder:text-[#d1d5db] print:border-none print:placeholder-transparent"
             />
           </div>
-          
+
           <div className="flex"><span className="w-28">Area</span><span>: {systemData.area}</span></div>
         </div>
 
         {/* CEKLIS HARIAN */}
         <div className="mb-10 text-[14px] font-semibold">
           <h4 className="font-bold mb-4">Ceklis Harian:</h4>
-          
+
           <div className="mb-4">
             <p className="mb-2">1. Pengecekan APD Sebelum Produksi:</p>
             <div className="flex gap-8 ml-4">
@@ -322,7 +375,7 @@ const ReportsContent = ({
         {/* CATATAN PENGAWAS */}
         <div className="mb-10">
           <h4 className="font-bold mb-2 text-[14px]">Catatan Pengawas:</h4>
-          <textarea 
+          <textarea
             value={catatan}
             onChange={(e) => setCatatan(e.target.value)}
             rows="3"
@@ -338,20 +391,27 @@ const ReportsContent = ({
           <table className="w-full border-collapse border border-black text-[13px] text-left">
             <thead>
               <tr className="bg-[#f3f4f6] print:bg-[#f3f4f6]">
-                <th className="border border-black px-3 py-2 w-[15%] font-bold">Waktu</th>
-                <th className="border border-black px-3 py-2 w-[20%] font-bold">Kode Pelanggaran</th>
-                <th className="border border-black px-3 py-2 w-[30%] font-bold">Bukti Pelanggaran</th>
-                <th className="border border-black px-3 py-2 w-[35%] font-bold">Tindakan</th>
+                <th className="border border-black px-3 py-2 w-[15%] font-bold">Tanggal</th>
+                <th className="border border-black px-3 py-2 w-[12%] font-bold">Waktu</th>
+                <th className="border border-black px-3 py-2 w-[22%] font-bold">Kode Pelanggaran</th>
+                <th className="border border-black px-3 py-2 w-[26%] font-bold">Bukti Pelanggaran</th>
+                <th className="border border-black px-3 py-2 w-[25%] font-bold">Tindakan</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log) => (
                 <tr key={log.id} className="print:break-inside-avoid">
+                  <td className="border border-black px-3 py-2 font-medium">{log.tanggal}</td>
                   <td className="border border-black px-3 py-2 font-medium">{log.waktu}</td>
-                  <td className="border border-black px-3 py-2 font-medium">{log.kode}</td>
+                  <td className="border border-black px-3 py-2 font-medium">
+                    <div className="flex flex-col">
+                      <span>{log.kode}</span>
+                      <span className="text-[11px] text-[#6b7280]">{log.label}</span>
+                    </div>
+                  </td>
                   <td className="border border-black px-3 py-2 text-[#1d4ed8] underline font-medium">{log.bukti}</td>
                   <td className="border border-black p-0">
-                    <input 
+                    <input
                       type="text"
                       value={log.tindakan}
                       onChange={(e) => handleTindakanChange(log.id, e.target.value)}
@@ -361,10 +421,10 @@ const ReportsContent = ({
                   </td>
                 </tr>
               ))}
-              
-              {/* Render baris kosong agar format tabel tetap terbentuk seperti kertas kosong */}
+
               {[...Array(emptyRowsNeeded)].map((_, i) => (
                 <tr key={`empty-${i}`} className="print:break-inside-avoid">
+                  <td className="border border-black px-3 py-4"></td>
                   <td className="border border-black px-3 py-4"></td>
                   <td className="border border-black px-3 py-4"></td>
                   <td className="border border-black px-3 py-4"></td>
@@ -374,7 +434,6 @@ const ReportsContent = ({
             </tbody>
           </table>
         </div>
-
       </div>
 
       {isPreviewOpen && previewPdfUrl ? (

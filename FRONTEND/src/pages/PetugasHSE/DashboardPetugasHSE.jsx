@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { fetchDashboardSummary, ping } from '../../api';
 import { Calendar, ChevronDown } from 'lucide-react';
 import LogsContent from './Logs';
 import LiveCamsContent from './LiveCamsContent';
 import ReportsContent from './Report';
+import ViolationTypes from './ViolationTypes';
 
-const optionsWaktu = ['Today', 'Weekly', 'Monthly'];
+const optionsWaktu = ['All', 'Today', 'Weekly', 'Monthly'];
 const optionsShift = ['All', 'Morning', 'Afternoon', 'Night'];
 const optionsArea = ['All', 'Packing', 'Warehouse', 'Production'];
 
@@ -17,6 +19,7 @@ const dataByPeriod = {
     violationDelta: '-3%',
     violationDeltaColor: 'text-[#e24b4b]',
     mostViolated: 'PPE-01',
+    mostViolatedLabel: 'Tidak Memakai Helm',
     mostViolatedPeriod: 'This day',
     compareText: 'vs yesterday',
     lineValues: [3, 11, 8, 18, 12, 15, 9, 6, 2],
@@ -31,6 +34,7 @@ const dataByPeriod = {
     violationDelta: '-6%',
     violationDeltaColor: 'text-[#e24b4b]',
     mostViolated: 'PPE-03',
+    mostViolatedLabel: 'Tidak Memakai Masker',
     mostViolatedPeriod: 'This week',
     compareText: 'vs last week',
     lineValues: [6, 10, 12, 15, 11, 9, 7],
@@ -45,6 +49,7 @@ const dataByPeriod = {
     violationDelta: '-8%',
     violationDeltaColor: 'text-[#e24b4b]',
     mostViolated: 'PPE-02',
+    mostViolatedLabel: 'Tidak Memakai Rompi (Vest)',
     mostViolatedPeriod: 'This month',
     compareText: 'vs last month',
     lineValues: [12, 14, 11, 15, 19, 16, 13, 12],
@@ -67,7 +72,7 @@ const buildLinePoints = (values, width, height, padding) => {
     .join(' ');
 };
 
-const DashboardMainContent = ({ selectedData, linePoints, maxBar}) => {
+const DashboardMainContent = ({ selectedData, linePoints, maxBar }) => {
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -93,6 +98,7 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar}) => {
           <h2 className="text-[22px] font-bold text-[#003f98] mb-4">Most Violated</h2>
           <div className="text-[64px] font-bold text-[#003f98] leading-none mb-3">{selectedData.mostViolated}</div>
           <div className="text-[20px] font-medium text-[#003f98]">{selectedData.mostViolatedPeriod}</div>
+          <div className="text-[13px] font-medium text-[#6b90c3]">{selectedData.mostViolatedLabel}</div>
         </div>
       </div>
 
@@ -181,20 +187,24 @@ const DashboardPetugasHSE = ({ onLogout }) => {
   const [waktu, setWaktu] = useState('Today');
   const [shift, setShift] = useState('All');
   const [area, setArea] = useState('All');
+  const todayIso = new Date().toISOString().slice(0, 10);
   const [reportDraft, setReportDraft] = useState({
-    startDate: '2026-03-27',
-    endDate: '2026-03-27',
-    shift: 'Morning (08:00 - 16:00)',
-    area: 'Area 1 - Packing',
+    startDate: todayIso,
+    endDate: todayIso,
+    shift: 'All',
+    area: 'All',
   });
   const [reportApplied, setReportApplied] = useState({
-    startDate: '2026-03-27',
-    endDate: '2026-03-27',
-    shift: 'Morning (08:00 - 16:00)',
-    area: 'Area 1 - Packing',
+    startDate: todayIso,
+    endDate: todayIso,
+    shift: 'All',
+    area: 'All',
   });
+  const [serverStatus, setServerStatus] = useState('Checking...');
+  const [dashboardData, setDashboardData] = useState(dataByPeriod);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
-  const selectedData = dataByPeriod[waktu];
+  const selectedData = dashboardData[waktu] || dataByPeriod[waktu] || dataByPeriod.Today;
 
   const linePoints = useMemo(
     () => buildLinePoints(selectedData.lineValues, 760, 240, 20),
@@ -203,6 +213,53 @@ const DashboardPetugasHSE = ({ onLogout }) => {
 
   const maxBar = Math.max(...selectedData.barValues, 25);
   const showTimeAndShiftFilters = activeMenu !== 'Live Cams';
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await ping();
+        if (!mounted) return;
+        setServerStatus(res.status_server || 'Unknown');
+      } catch {
+        if (!mounted) return;
+        setServerStatus('Offline ❌');
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const controller = new AbortController();
+
+    const load = async () => {
+      setIsDashboardLoading(true);
+      try {
+        const period = waktu === 'All' ? 'All' : waktu;
+        const data = await fetchDashboardSummary({ period, shift, area, signal: controller.signal });
+        if (!mounted || !data) return;
+        setDashboardData((prev) => ({
+          ...prev,
+          [waktu]: data,
+        }));
+      } finally {
+        if (mounted) {
+          setIsDashboardLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [waktu, shift, area]);
 
   const handleGenerateReport = () => {
     setReportApplied({ ...reportDraft });
@@ -228,6 +285,10 @@ const DashboardPetugasHSE = ({ onLogout }) => {
       );
     }
 
+    if (activeMenu === 'PPE Types') {
+      return <ViolationTypes />;
+    }
+
     return (
       <DashboardMainContent
         selectedData={selectedData}
@@ -249,6 +310,7 @@ const DashboardPetugasHSE = ({ onLogout }) => {
           </div>
           <div>
             <p className="text-[10px] text-white/70 mb-1">Friday, 27 March 2026</p>
+            <p className="text-[10px] text-white/70 mb-1">Backend: {serverStatus}</p>
             <p className="text-xs text-white/90">Hello,</p>
             <p className="text-lg font-bold tracking-wide">Pham Hanni</p>
           </div>
@@ -258,7 +320,7 @@ const DashboardPetugasHSE = ({ onLogout }) => {
           <div className="mb-6 h-px w-full bg-white/20" />
 
           <nav className="mb-8 flex flex-col gap-5 text-base">
-            {['Dashboard', 'Live Cams', 'Reports', 'Logs'].map((menu) => {
+            {['Dashboard', 'Live Cams', 'Reports', 'Logs', 'PPE Types'].map((menu) => {
               const isActive = activeMenu === menu;
               return (
                 <button
@@ -312,6 +374,7 @@ const DashboardPetugasHSE = ({ onLogout }) => {
                       onChange={(event) => setReportDraft((prev) => ({ ...prev, shift: event.target.value }))}
                       className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
                     >
+                      <option value="All" className="text-black">All</option>
                       <option value="Morning (08:00 - 16:00)" className="text-black">Morning (08:00 - 16:00)</option>
                       <option value="Afternoon (16:00 - 00:00)" className="text-black">Afternoon (16:00 - 00:00)</option>
                       <option value="Night (00:00 - 08:00)" className="text-black">Night (00:00 - 08:00)</option>
@@ -328,6 +391,7 @@ const DashboardPetugasHSE = ({ onLogout }) => {
                       onChange={(event) => setReportDraft((prev) => ({ ...prev, area: event.target.value }))}
                       className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
                     >
+                      <option value="All" className="text-black">All</option>
                       <option value="Area 1 - Packing" className="text-black">Area 1 - Packing</option>
                       <option value="Area 2 - Warehouse" className="text-black">Area 2 - Warehouse</option>
                       <option value="Area 3 - Production" className="text-black">Area 3 - Production</option>
@@ -345,7 +409,7 @@ const DashboardPetugasHSE = ({ onLogout }) => {
                 </button>
               </div>
             </div>
-          ) : (
+          ) : activeMenu === 'PPE Types' ? null : (
             <div className="mb-6 border-y border-white/20 py-4">
               <div className="flex flex-col gap-4">
                 {showTimeAndShiftFilters ? (
@@ -413,6 +477,9 @@ const DashboardPetugasHSE = ({ onLogout }) => {
       </aside>
 
       <main className={`flex-1 p-10 ${activeMenu === 'Logs' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        {isDashboardLoading && activeMenu === 'Dashboard' ? (
+          <div className="mb-4 text-sm font-medium text-[#6b90c3]">Loading dashboard data...</div>
+        ) : null}
         {renderMainContent()}
       </main>
     </div>
