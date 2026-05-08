@@ -379,13 +379,12 @@ while cap.isOpened():
 
         # 2. Lempar data (termasuk link ImgBB) ke Backend Temanmu
         if image_url: # Pastikan fotonya berhasil ke-upload dulu
+       
             payload_be = {
-                # camera_id tetap identitas kamera fisik/logical device
-                "camera_id": "CCTV 01",
-                # site_location dipakai untuk area operasional yang tampil di report/telegram
-                "site_location": SITE_LOCATION,
+                # Gunakan variabel SITE_LOCATION agar dinamis sesuai filter di dashboard
+                "camera_id": SITE_LOCATION, 
                 "label": vtype,
-                "image_path": image_url, # <-- Link ini yang bakal ditangkap BE
+                "image_path": image_url, 
                 "id_pekerja": str(tid)
             }
 
