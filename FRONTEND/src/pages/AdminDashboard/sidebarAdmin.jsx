@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import defaultImg from "../../assets/placeholderProfile.jpg";
 
-function Sidebar({ onLogout }) {
+function Sidebar({ onLogout, username = 'Admin' }) {
   const today = new Date().toLocaleDateString("id-ID", {
     weekday: "long",
     day: "2-digit",
@@ -63,7 +63,7 @@ function Sidebar({ onLogout }) {
               fontWeight: "bold",
             }}
           >
-            John Doe
+            {username}
           </p>
         </div>
 

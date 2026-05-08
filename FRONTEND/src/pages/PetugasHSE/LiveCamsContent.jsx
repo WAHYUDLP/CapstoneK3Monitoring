@@ -1,26 +1,71 @@
 import React, { useState } from 'react';
 import { Camera, CameraOff } from 'lucide-react';
 
-// Mock CCTV feed list
+// CCTV feed list (single-active selection). name should match backend SITE_LOCATION strings.
 const cameraFeeds = [
-  { id: 1, name: 'CCTV 01 - Area 1', status: 'live' },
-  { id: 2, name: 'CCTV 02 - Area 2', status: 'live' },
-  { id: 3, name: 'CCTV 03 - Area 3', status: 'live' },
+  { id: 1, name: 'Area 1 - Packing', status: 'live' },
+  { id: 2, name: 'Area 2 - Warehouse', status: 'live' },
+  { id: 3, name: 'Area 3 - Production', status: 'live' },
 ];
 
 const LiveCamsContent = () => {
   const [activeCameras, setActiveCameras] = useState(() =>
     cameraFeeds.reduce((accumulator, feed) => {
-      accumulator[feed.id] = true;
+      accumulator[feed.id] = false;
       return accumulator;
     }, {}),
   );
 
-  const toggleCamera = (cameraId) => {
-    setActiveCameras((previous) => ({
-      ...previous,
-      [cameraId]: !previous[cameraId],
-    }));
+  // Backend API
+  const BACKEND_ACTIVE_URL = 'http://127.0.0.1:9001/active-camera';
+
+  // load current active camera from backend on mount
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch(BACKEND_ACTIVE_URL);
+        if (!mounted) return;
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.cameraId) {
+          setActiveCameras(() => {
+            const next = {};
+            cameraFeeds.forEach((f) => {
+              next[f.id] = f.id === data.cameraId;
+            });
+            return next;
+          });
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const toggleCamera = async (cameraId) => {
+    // If enabling, make this the only enabled camera. If disabling, disable all.
+    const willEnable = !activeCameras[cameraId];
+    const next = {};
+    cameraFeeds.forEach((f) => {
+      next[f.id] = willEnable ? f.id === cameraId : false;
+    });
+    setActiveCameras(next);
+
+    // send to backend
+    const cam = cameraFeeds.find((c) => c.id === cameraId);
+    try {
+      await fetch(BACKEND_ACTIVE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cameraId: willEnable ? cam.id : null, name: willEnable ? cam.name : null }),
+      });
+    } catch (e) {
+      console.error('Failed to set active camera', e);
+    }
   };
 
   return (

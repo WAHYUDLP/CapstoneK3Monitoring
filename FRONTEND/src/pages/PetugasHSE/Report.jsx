@@ -404,9 +404,9 @@ const ReportsContent = ({
                   <td className="border border-black px-3 py-2 font-medium">{log.tanggal}</td>
                   <td className="border border-black px-3 py-2 font-medium">{log.waktu}</td>
                   <td className="border border-black px-3 py-2 font-medium">
-                    <div className="flex flex-col">
-                      <span>{log.kode}</span>
-                      <span className="text-[11px] text-[#6b7280]">{log.label}</span>
+                    <div className="flex flex-col break-words whitespace-normal">
+                      <span className="break-words">{log.kode}</span>
+                      <span className="text-[11px] text-[#6b7280] break-words">{log.label}</span>
                     </div>
                   </td>
                   <td className="border border-black px-3 py-2 text-[#1d4ed8] underline font-medium">{log.bukti}</td>

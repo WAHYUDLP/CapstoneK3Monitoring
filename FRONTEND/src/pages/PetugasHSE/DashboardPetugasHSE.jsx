@@ -72,7 +72,16 @@ const buildLinePoints = (values, width, height, padding) => {
     .join(' ');
 };
 
-const DashboardMainContent = ({ selectedData, linePoints, maxBar }) => {
+const DashboardMainContent = ({ selectedData, linePoints }) => {
+  // Ensure we always render 7 bars (PPE-01..PPE-07) inside this component
+  const barValues7 = (() => {
+    const vals = Array.isArray(selectedData.barValues) ? selectedData.barValues.slice() : [];
+    while (vals.length < 7) vals.push(0);
+    return vals.slice(0, 7);
+  })();
+
+  const maxBarLocal = Math.max(...barValues7, 25);
+
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -158,8 +167,8 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar }) => {
               </div>
 
               <div className="relative h-full flex items-end justify-around pb-8 pt-2 z-20">
-                {selectedData.barValues.map((value, index) => {
-                  const heightPercent = Math.min((value / maxBar) * 100, 100);
+                {barValues7.map((value, index) => {
+                  const heightPercent = Math.min((value / maxBarLocal) * 100, 100);
                   return (
                     <div key={index} className="flex flex-col items-center justify-end h-full w-full">
                       <div className="w-10 sm:w-14 bg-[#2b60aa] rounded-t-md transition-all duration-500 ease-in-out" style={{ height: `${heightPercent}%` }} title={`Value: ${value}`} />
@@ -169,8 +178,8 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar }) => {
               </div>
 
               <div className="absolute bottom-2 left-0 w-full flex justify-around text-[11px] text-[#6b90c3] font-medium z-20">
-                {selectedData.barValues.map((_, i) => (
-                  <span key={i}>PPE-0{i + 1}</span>
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <span key={i}>{`PPE-0${i + 1}`}</span>
                 ))}
               </div>
             </div>
@@ -182,7 +191,7 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar }) => {
   );
 };
 
-const DashboardPetugasHSE = ({ onLogout }) => {
+const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [waktu, setWaktu] = useState('Today');
   const [shift, setShift] = useState('All');
@@ -211,7 +220,14 @@ const DashboardPetugasHSE = ({ onLogout }) => {
     [selectedData.lineValues]
   );
 
-  const maxBar = Math.max(...selectedData.barValues, 25);
+  // Ensure we always render 7 bars (PPE-01..PPE-07). Pad with zeros if needed.
+  const barValues7 = (() => {
+    const vals = Array.isArray(selectedData.barValues) ? selectedData.barValues.slice() : [];
+    while (vals.length < 7) vals.push(0);
+    return vals.slice(0, 7);
+  })();
+
+  const maxBar = Math.max(...barValues7, 25);
   const showTimeAndShiftFilters = activeMenu !== 'Live Cams';
 
   useEffect(() => {
@@ -312,7 +328,7 @@ const DashboardPetugasHSE = ({ onLogout }) => {
             <p className="text-[10px] text-white/70 mb-1">Friday, 27 March 2026</p>
             <p className="text-[10px] text-white/70 mb-1">Backend: {serverStatus}</p>
             <p className="text-xs text-white/90">Hello,</p>
-            <p className="text-lg font-bold tracking-wide">Pham Hanni</p>
+            <p className="text-lg font-bold tracking-wide">{username}</p>
           </div>
         </div>
 

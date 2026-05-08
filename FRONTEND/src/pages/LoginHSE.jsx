@@ -23,14 +23,22 @@ const LoginHSE = ({ onLoginSuccess }) => {
   // }
 
   const handleSubmit = (event) => {
-  event.preventDefault()
+    event.preventDefault()
 
-  if (formData.username === "admin" && formData.password === "123") {
-    onLoginSuccess?.("admin") //khusus role atmin
-  } else {
-    onLoginSuccess?.("petugas") //lainnya
+    if (formData.username === "admin" && formData.password === "123") {
+      onLoginSuccess?.({
+        role: "admin",
+        username: formData.username,
+      })
+    } else if (formData.username === "HSE" && formData.password === "HSE123") {
+      onLoginSuccess?.({
+        role: "petugas",
+        username: formData.username,
+      })
+    } else {
+      alert('Invalid username or password')
+    }
   }
-}
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#e6ecf5] px-4 py-8 sm:py-12">

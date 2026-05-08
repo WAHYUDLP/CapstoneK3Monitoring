@@ -14,25 +14,80 @@ const LogsContent = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [logsData, setLogsData] = useState(initialMock);
 
+  // Local mapping from APD part to code and Indonesian label
+  const PPE_CODE_MAP = {
+    helmet: 'PPE-01',
+    vest: 'PPE-02',
+    mask: 'PPE-03',
+  };
+
+  const LABEL_MAP_INDO = {
+    helmet: 'Tidak Memakai Helm',
+    vest: 'Tidak Memakai Rompi (Vest)',
+    mask: 'Tidak Memakai Masker',
+    any_apd: 'Tidak Memakai APD Lengkap',
+  };
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       const rows = await fetchViolations(200);
       if (!mounted) return;
       if (!rows || rows.length === 0) return;
+
+      // sort newest first by created_at
+      rows.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      const normalize = (s = '') => String(s).trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+
       const mapped = rows.map((r) => {
         const dt = r.created_at ? new Date(r.created_at) : new Date();
         const date = dt.toLocaleDateString('id-ID');
         const time = dt.toLocaleTimeString('id-ID');
         const evidenceName = r.image_path ? r.image_path.split('/').pop() : '';
         const evidenceUrl = r.image_path || '';
+
+        const rawLabel = r.label || r.violation_type || r.violation_label || '';
+        const labelNorm = normalize(rawLabel);
+
+        let violationCode = r.violation_code || '-';
+        let violationLabel = r.violation_label || '-';
+
+        // handle combined labels like 'not_wearing_helmet_and_vest' or 'not wearing helmet and vest'
+        if (labelNorm.includes('_and_') || labelNorm.includes('_dan_') || labelNorm.includes(' and ')) {
+          // split by _and_
+          const core = labelNorm.startsWith('not_wearing_') ? labelNorm.replace(/^not_wearing_/, '') : labelNorm;
+          const parts = core.split('_and_').join('_and_').split('_and_');
+          const codes = [];
+          const labels = [];
+          parts.forEach((p) => {
+            const part = p.replace(/^not_wearing_/, '').replace(/^_/, '').replace(/_and_/, '');
+            const key = part;
+            codes.push(PPE_CODE_MAP[key] || '-');
+            labels.push(LABEL_MAP_INDO[key] || part.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+          });
+          violationCode = codes.join(', ');
+          violationLabel = labels.join(' dan ');
+        } else {
+          // single label
+          const stripped = labelNorm.startsWith('not_wearing_') ? labelNorm.replace(/^not_wearing_/, '') : labelNorm;
+          if (PPE_CODE_MAP[stripped]) {
+            violationCode = PPE_CODE_MAP[stripped];
+            violationLabel = LABEL_MAP_INDO[stripped] || violationLabel;
+          } else {
+            // fallback to whatever backend provided
+            violationCode = r.violation_code || violationCode;
+            violationLabel = r.violation_label || violationLabel;
+          }
+        }
+
         return {
           id: r.id,
           area: r.camera_id || 'Unknown',
           date,
           time,
-          violationCode: r.violation_code || '-',
-          violationLabel: r.violation_label || r.violation_type || '-',
+          violationCode,
+          violationLabel,
           evidenceName,
           evidenceUrl,
         };
@@ -115,9 +170,9 @@ const LogsContent = () => {
             
             {/* Table rows */}
             <tbody className="divide-y divide-[#e6ecf5]">
-              {paginatedRows.map((log) => (
-                <tr key={log.id} className="hover:bg-[#f0f4f9] transition-colors duration-200">
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#00265d]">{log.id}</td>
+              {paginatedRows.map((log, idx) => (
+                <tr key={log.id || idx} className="hover:bg-[#f0f4f9] transition-colors duration-200">
+                  <td className="px-6 py-4 text-[14px] font-medium text-[#00265d]">{(currentPage - 1) * pageSize + idx + 1}</td>
                   <td className="px-6 py-4 text-[14px] font-medium text-[#00265d]">{log.area}</td>
                   <td className="px-6 py-4 text-[14px] font-medium text-[#6b90c3]">{log.date}</td>
                   <td className="px-6 py-4 text-[14px] font-medium text-[#6b90c3]">{log.time}</td>

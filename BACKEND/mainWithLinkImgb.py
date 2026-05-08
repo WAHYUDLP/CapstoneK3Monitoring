@@ -13,13 +13,33 @@ from collections import defaultdict
 IMGBB_API_KEY = "158ee9e068a89b28e5b374a664a8e192" 
 
 # Info lokasi kejadian
-SITE_LOCATION = "Area Proyek A"
+SITE_LOCATION = os.environ.get("SITE_LOCATION_OVERRIDE", "Area Proyek A")
 SITE_LAT = ""
 SITE_LON = ""
 TIMEZONE_NAME = "Asia/Jakarta"
 
 # URL Backend
-URL_BACKEND = "http://localhost:8000/report-violation"
+URL_BACKEND = "http://127.0.0.1:9001/report-violation"
+ACTIVE_CAMERA_URL = "http://127.0.0.1:9001/active-camera"
+_last_active_check = 0
+ACTIVE_CHECK_INTERVAL = 5.0  # seconds
+
+
+def _init_active_camera_from_backend():
+    global SITE_LOCATION
+    try:
+        resp = requests.get(ACTIVE_CAMERA_URL, timeout=1.0)
+        if resp.status_code == 200:
+            j = resp.json()
+            if j and j.get("name"):
+                SITE_LOCATION = j.get("name")
+                print(f"INFO: Initialized SITE_LOCATION from backend: {SITE_LOCATION}")
+            else:
+                print("INFO: No active camera set in backend; using default SITE_LOCATION.")
+        else:
+            print(f"INFO: Active-camera endpoint returned {resp.status_code}; using default SITE_LOCATION.")
+    except Exception as e:
+        print(f"INFO: Could not fetch active camera at startup: {e}; using default SITE_LOCATION.")
 
 # --- INISIALISASI MODEL ---
 model = YOLO('best.pt')
@@ -120,11 +140,14 @@ DISPLAY_UPSCALE = 2.0
 MISSING_FRAMES_THRESHOLD = 10
 NEVER_WEAR_FRAMES = 5
 TELEGRAM_RENOTIFY_INTERVAL_SEC = 300
+# Cooldown global per track ID agar alert beda jenis tidak mepet.
+PERSON_ALERT_COOLDOWN_SEC = 120
 ALERT_SPATIAL_DISTANCE_PX = 100
 MIN_SEEN_FRAMES_FOR_REMOVE_ALERT = 3
 
 tracked_states = {}
 last_violation_notification = {}
+last_person_notification = {}
 recent_alert_locations = defaultdict(list)
 recent_violations = []
 
@@ -197,6 +220,21 @@ print("Kontrol runtime: 'p' pause/resume, 's' split view, 'q' quit")
 print("=== SISTEM MONITORING K3 AKTIF ===")
 
 while cap.isOpened():
+    # refresh SITE_LOCATION from backend active camera if available
+    try:
+        now_ts = time.time()
+        if now_ts - _last_active_check >= ACTIVE_CHECK_INTERVAL:
+            _last_active_check = now_ts
+            try:
+                resp = requests.get(ACTIVE_CAMERA_URL, timeout=1.0)
+                if resp.status_code == 200:
+                    j = resp.json()
+                    if j and j.get("name"):
+                        SITE_LOCATION = j.get("name")
+            except Exception:
+                pass
+    except Exception:
+        pass
     success, frame = cap.read()
     if not success:
         print("ERROR: Gagal membaca frame dari kamera.")
@@ -269,6 +307,11 @@ while cap.isOpened():
         key_violation = (tid, vtype)
         now_ts = time.time()
         last_sent_ts = last_violation_notification.get(key_violation)
+        last_person_ts = last_person_notification.get(tid)
+
+        # Cek Anti Spam Per-Orang (berlaku lintas jenis pelanggaran)
+        if last_person_ts is not None and (now_ts - last_person_ts) < PERSON_ALERT_COOLDOWN_SEC:
+            return
         
         # Cek Anti Spam Waktu
         if last_sent_ts is not None and (now_ts - last_sent_ts) < TELEGRAM_RENOTIFY_INTERVAL_SEC:
@@ -334,6 +377,7 @@ while cap.isOpened():
         # 3. Update State UI AI
         pelanggar_tercatat.add(key_violation)
         last_violation_notification[key_violation] = now_ts
+        last_person_notification[tid] = now_ts
         recent_alert_locations[vtype].append((now_ts, center_x, center_y))
         recent_violations.insert(0, (now_ts, f"{event_time} | ID {tid} | {vtype}"))
         if len(recent_violations) > 20:
@@ -346,6 +390,8 @@ while cap.isOpened():
             "ever": set(),
             "seen_counts": defaultdict(int),
             "missing_counts": defaultdict(int),
+            # Once classified as not_wearing_any_apd, suppress per-item not_wearing alerts for this track.
+            "reported_not_wearing_any": False,
         })
         state["age"] += 1
         current_present = detected_apd_per_person.get(person_id, set())
@@ -366,12 +412,30 @@ while cap.isOpened():
             ):
                 report_violation(person_id, f"attempt_remove_{apd_name}", frame, current_present, person_boxes[person_id]["bbox"])
 
-        if state["age"] >= NEVER_WEAR_FRAMES and not any(apd in state["ever"] for apd in APD_CLASS_MAP.values()):
-            report_violation(person_id, "not_wearing_any_apd", frame, current_present, person_boxes[person_id]["bbox"])
-        else:
-            for apd_name in APD_CLASS_MAP.values():
-                if state["age"] >= NEVER_WEAR_FRAMES and apd_name not in state["ever"]:
-                    report_violation(person_id, f"not_wearing_{apd_name}", frame, current_present, person_boxes[person_id]["bbox"])
+        # After enough seen frames, compute missing APD set and report once per person.
+        if state["age"] >= NEVER_WEAR_FRAMES:
+            all_apds = list(APD_CLASS_MAP.values())
+            missing = [apd for apd in all_apds if apd not in state["ever"]]
+
+            # If nothing missing, skip
+            if not missing:
+                continue
+
+            # If we've already reported a combined missing alert for this person, skip
+            if state.get("reported_not_wearing_any"):
+                continue
+
+            # Build label: if missing everything use generic key, if one use not_wearing_x, else combine
+            if len(missing) == len(all_apds):
+                label_to_send = "not_wearing_any_apd"
+            elif len(missing) == 1:
+                label_to_send = f"not_wearing_{missing[0]}"
+            else:
+                # e.g. not_wearing_helmet_and_vest
+                label_to_send = "not_wearing_" + "_and_".join(missing)
+
+            report_violation(person_id, label_to_send, frame, current_present, person_boxes[person_id]["bbox"])
+            state["reported_not_wearing_any"] = True
 
     display_img = results[0].plot()
 
@@ -403,14 +467,24 @@ while cap.isOpened():
         cv2.imshow(WINDOW_NAME, display_img)
         
     key = cv2.waitKey(1) & 0xFF
-    if key == ord('q'):
-        break
-    if key == ord('p'):
-        monitoring_enabled = not monitoring_enabled
-        print("Monitoring paused" if not monitoring_enabled else "Monitoring resumed")
-    if key == ord('s'):
-        split_view = not split_view
-        print("Split view ON" if split_view else "Split view OFF")
+    # Robust key handling: accept upper/lower case and ignore special codes
+    if key != 255:
+        try:
+            kch = chr(key).lower()
+        except Exception:
+            kch = ""
+        # debug print when key pressed (helps diagnose missing focus)
+        if kch:
+            print(f"Key pressed: {kch} (code {key})")
+
+        if kch == 'q':
+            break
+        if kch == 'p':
+            monitoring_enabled = not monitoring_enabled
+            print("Monitoring paused" if not monitoring_enabled else "Monitoring resumed")
+        if kch == 's':
+            split_view = not split_view
+            print("Split view ON" if split_view else "Split view OFF")
 
 cap.release()
 cv2.destroyAllWindows()
