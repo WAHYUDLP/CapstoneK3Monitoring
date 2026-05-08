@@ -77,6 +77,7 @@ const ReportsContent = ({
   const [isSaving, setIsSaving] = useState(false); 
 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isLoadingViolations, setIsLoadingViolations] = useState(false);
   const [previewPdfUrl, setPreviewPdfUrl] = useState('');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const reportPaperRef = useRef(null);
@@ -112,6 +113,7 @@ const ReportsContent = ({
   useEffect(() => {
     let mounted = true;
     (async () => {
+      setIsLoadingViolations(true);
       const rows = await fetchViolationsFiltered({
         startDate: filterStartDate,
         endDate: filterEndDate,
@@ -120,6 +122,7 @@ const ReportsContent = ({
       });
 
       if (!mounted) return;
+      setIsLoadingViolations(false);
       if (!rows || rows.length === 0) {
         setLogs([]);
         return;
@@ -262,7 +265,15 @@ const ReportsContent = ({
   const emptyRowsNeeded = Math.max(0, MINIMUM_ROWS - logs.length);
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto font-sans">
+    <div className={`h-full min-h-0 overflow-y-auto font-sans transition-opacity duration-300 ${isLoadingViolations ? 'opacity-50' : 'opacity-100'} relative`}>
+      {isLoadingViolations && (
+        <div className="absolute inset-0 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 animate-spin rounded-full border-3 border-[#003f98] border-t-transparent" />
+            <p className="text-sm font-medium text-[#003f98]">Loading violations...</p>
+          </div>
+        </div>
+      )}
       {/* Tombol Aksi */}
       <div className="mx-auto mb-6 flex w-full max-w-4xl items-center justify-end gap-3 print:hidden">
         

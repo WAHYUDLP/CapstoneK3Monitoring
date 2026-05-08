@@ -196,7 +196,12 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
   const [waktu, setWaktu] = useState('Today');
   const [shift, setShift] = useState('All');
   const [area, setArea] = useState('All');
+  const [isPageTransitioning, setIsPageTransitioning] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const todayIso = new Date().toISOString().slice(0, 10);
+  const [logsStartDate, setLogsStartDate] = useState(todayIso);
+  const [logsEndDate, setLogsEndDate] = useState(todayIso);
+  const [logsArea, setLogsArea] = useState('All');
   const [reportDraft, setReportDraft] = useState({
     startDate: todayIso,
     endDate: todayIso,
@@ -277,13 +282,30 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
     };
   }, [waktu, shift, area]);
 
+  const handleMenuSelect = (menu) => {
+    setIsPageTransitioning(true);
+    setTimeout(() => {
+      setActiveMenu(menu);
+    }, 150);
+    setTimeout(() => {
+      setIsPageTransitioning(false);
+    }, 300);
+  };
+
+  const handleLogout = () => {
+    setIsLoggingOut(true);
+    setTimeout(() => {
+      onLogout();
+    }, 500);
+  };
+
   const handleGenerateReport = () => {
     setReportApplied({ ...reportDraft });
   };
 
   const renderMainContent = () => {
     if (activeMenu === 'Logs') {
-      return <LogsContent />;
+      return <LogsContent filterStartDate={logsStartDate} filterEndDate={logsEndDate} filterArea={logsArea} />;
     }
 
     if (activeMenu === 'Live Cams') {
@@ -342,8 +364,8 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
                 <button
                   key={menu}
                   type="button"
-                  onClick={() => setActiveMenu(menu)}
-                  className={`cursor-pointer text-left ${
+                  onClick={() => handleMenuSelect(menu)}
+                  className={`cursor-pointer text-left transition-opacity duration-200 ${
                     isActive ? 'font-bold text-white' : 'text-white/80 hover:text-white'
                   }`}
                 >
@@ -425,7 +447,54 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
                 </button>
               </div>
             </div>
-          ) : activeMenu === 'PPE Types' ? null : (
+          ) : activeMenu === 'PPE Types' ? null : activeMenu === 'Logs' ? (
+            <div className="mb-6 border-y border-white/20 py-4">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">Start Date</label>
+                  <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
+                    <Calendar className="h-4 w-4 shrink-0 text-white" />
+                    <input
+                      type="date"
+                      value={logsStartDate}
+                      onChange={(event) => setLogsStartDate(event.target.value)}
+                      className="scheme-dark w-full bg-transparent text-sm text-white outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">End Date</label>
+                  <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
+                    <Calendar className="h-4 w-4 shrink-0 text-white" />
+                    <input
+                      type="date"
+                      value={logsEndDate}
+                      onChange={(event) => setLogsEndDate(event.target.value)}
+                      className="scheme-dark w-full bg-transparent text-sm text-white outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">Area</label>
+                  <div className="relative">
+                    <select
+                      value={logsArea}
+                      onChange={(event) => setLogsArea(event.target.value)}
+                      className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
+                    >
+                      <option value="All" className="text-black">All</option>
+                      <option value="Area 1 - Packing" className="text-black">Area 1 - Packing</option>
+                      <option value="Area 2 - Warehouse" className="text-black">Area 2 - Warehouse</option>
+                      <option value="Area 3 - Production" className="text-black">Area 3 - Production</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
             <div className="mb-6 border-y border-white/20 py-4">
               <div className="flex flex-col gap-4">
                 {showTimeAndShiftFilters ? (
@@ -485,18 +554,21 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
         </div>
 
         <button
-          onClick={onLogout}
-          className="mt-8 w-25 rounded-md border border-white/50 px-4 py-2 text-center text-sm text-white transition-colors hover:bg-white/10"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className={`mt-8 w-25 rounded-md border border-white/50 px-4 py-2 text-center text-sm text-white transition-all duration-300 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed ${isLoggingOut ? 'opacity-50' : 'opacity-100'}`}
         >
-          Log Out
+          {isLoggingOut ? 'Logging out...' : 'Log Out'}
         </button>
       </aside>
 
-      <main className={`flex-1 p-10 ${activeMenu === 'Logs' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      <main className={`flex-1 p-10 ${activeMenu === 'Logs' ? 'overflow-hidden' : 'overflow-y-auto'} transition-all duration-300 ${isPageTransitioning || isLoggingOut ? 'opacity-50' : 'opacity-100'}`}>
         {isDashboardLoading && activeMenu === 'Dashboard' ? (
           <div className="mb-4 text-sm font-medium text-[#6b90c3]">Loading dashboard data...</div>
         ) : null}
-        {renderMainContent()}
+        <div className={`transition-opacity duration-300 ${isPageTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+          {renderMainContent()}
+        </div>
       </main>
     </div>
   );

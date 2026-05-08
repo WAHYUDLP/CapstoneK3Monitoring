@@ -15,6 +15,7 @@ const LiveCamsContent = ({ area = 'All' }) => {
       return accumulator;
     }, {}),
   );
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Backend API
   const BACKEND_BASE_URL = 'http://127.0.0.1:9001';
@@ -61,6 +62,7 @@ const LiveCamsContent = ({ area = 'All' }) => {
 
   const toggleCamera = async (cameraId) => {
     // If enabling, make this the only enabled camera. If disabling, disable all.
+    setIsTransitioning(true);
     const willEnable = !activeCameras[cameraId];
     const next = {};
     cameraFeeds.forEach((f) => {
@@ -78,6 +80,8 @@ const LiveCamsContent = ({ area = 'All' }) => {
       });
     } catch (error) {
       console.error('Failed to set active camera', error);
+    } finally {
+      setTimeout(() => setIsTransitioning(false), 300);
     }
   };
 
@@ -87,9 +91,9 @@ const LiveCamsContent = ({ area = 'All' }) => {
   const renderCard = (cam, size = 'small') => (
     <div
       key={cam.id}
-      className={`relative rounded-sm shadow-md border ${size === 'large' ? 'aspect-video w-full lg:h-[520px]' : 'aspect-video w-full'} flex flex-col items-center justify-center overflow-hidden group transition-all duration-200 ${
+      className={`relative rounded-sm shadow-md border ${size === 'large' ? 'aspect-video w-full lg:h-[520px]' : 'aspect-video w-full'} flex flex-col items-center justify-center overflow-hidden group transition-all duration-300 ${
         activeCameras[cam.id] ? liveClass : disabledClass
-      }`}
+      } ${isTransitioning ? 'opacity-70' : 'opacity-100'}`}
     >
       {/* Camera info overlay */}
       <div className="absolute top-4 left-4 z-10 flex items-center gap-3">
@@ -137,24 +141,24 @@ const LiveCamsContent = ({ area = 'All' }) => {
   );
 
   return (
-    <div className="h-full min-h-0 flex flex-col font-sans">
+    <div className={`h-full min-h-0 flex flex-col font-sans transition-opacity duration-300 ${isTransitioning ? 'opacity-70' : 'opacity-100'}`}>
       <div className="flex flex-col gap-6 w-full">
         {/* If a specific area is selected, show one large card for that area */}
         {selectedAreaName ? (
           (() => {
             const cam = cameraFeeds.find((c) => c.name === selectedAreaName);
             if (!cam) return <div className="text-sm text-[#6b90c3]">Area tidak ditemukan.</div>;
-            return <div className="w-full">{renderCard(cam, 'large')}</div>;
+            return <div className="w-full transition-all duration-300">{renderCard(cam, 'large')}</div>;
           })()
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full transition-all duration-300">
             {cameraFeeds.slice(0, 2).map((cam) => renderCard(cam, 'small'))}
           </div>
         )}
 
         {/* If no area filter selected, show the third camera as the large centered card */}
         {!selectedAreaName && (
-          <div className="flex justify-center w-full">
+          <div className="flex justify-center w-full transition-all duration-300">
             <div className="w-full lg:w-1/2">{renderCard(cameraFeeds[2], 'small')}</div>
           </div>
         )}

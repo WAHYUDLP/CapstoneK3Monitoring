@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { fetchViolations } from '../../api';
+import { fetchViolationsFiltered } from '../../api';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 
 // initial placeholder until API results arrive
@@ -9,11 +9,10 @@ const initialMock = [
 
 const pageSizeOptions = [10, 15, 20, 25];
 
-const LogsContent = () => {
+const LogsContent = ({ filterStartDate = '', filterEndDate = '', filterArea = 'All' }) => {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [logsData, setLogsData] = useState(initialMock);
-
+  const [logsData, setLogsData] = useState(initialMock);  const [isLoading, setIsLoading] = useState(false);
   // Local mapping from APD part to code and Indonesian label
   const PPE_CODE_MAP = {
     helmet: 'PPE-01',
@@ -31,9 +30,19 @@ const LogsContent = () => {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const rows = await fetchViolations(200);
+      setIsLoading(true);
+      setCurrentPage(1);
+      const rows = await fetchViolationsFiltered({
+        startDate: filterStartDate,
+        endDate: filterEndDate,
+        area: filterArea,
+      });
       if (!mounted) return;
-      if (!rows || rows.length === 0) return;
+      setIsLoading(false);
+      if (!rows || rows.length === 0) {
+        setLogsData([]);
+        return;
+      }
 
       // sort newest first by created_at
       rows.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
@@ -83,7 +92,7 @@ const LogsContent = () => {
 
         return {
           id: r.id,
-          area: r.camera_id || 'Unknown',
+          area: r.site_location || r.camera_id || 'Unknown',
           date,
           time,
           violationCode,
@@ -97,7 +106,7 @@ const LogsContent = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [filterStartDate, filterEndDate, filterArea]);
 
   const totalRows = logsData.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -123,7 +132,15 @@ const LogsContent = () => {
     <div className="h-full min-h-0 flex flex-col font-sans overflow-hidden">
       
       {/* Card wrapper */}
-      <div className="bg-white rounded-xl shadow-sm border border-[#c8d6ea] flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-[#c8d6ea] flex flex-col flex-1 min-h-0 overflow-hidden relative">
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/40 rounded-xl flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-8 w-8 animate-spin rounded-full border-3 border-[#003f98] border-t-transparent" />
+              <p className="text-sm font-medium text-[#003f98]">Filtering logs...</p>
+            </div>
+          </div>
+        )}
         
         {/* Card Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#e6ecf5]">
@@ -154,7 +171,7 @@ const LogsContent = () => {
         </div>
 
         {/* Table Area */}
-        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto">
+        <div className={`flex-1 min-h-0 overflow-x-auto overflow-y-auto transition-opacity duration-300 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
           <table className="w-full text-left border-collapse min-w-[800px]">
             {/* Table header */}
             <thead className="bg-[#f4f7fb]">

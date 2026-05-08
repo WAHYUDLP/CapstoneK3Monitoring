@@ -6,6 +6,7 @@ const LoginHSE = ({ onLoginSuccess }) => {
     username: '',
     password: '',
   })
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -24,31 +25,36 @@ const LoginHSE = ({ onLoginSuccess }) => {
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    setIsLoading(true)
 
-    if (formData.username === "admin" && formData.password === "123") {
-      onLoginSuccess?.({
-        role: "admin",
-        username: formData.username,
-      })
-    } else if (formData.username === "HSE" && formData.password === "HSE123") {
-      onLoginSuccess?.({
-        role: "petugas",
-        username: formData.username,
-      })
-    } else {
-      alert('Invalid username or password')
-    }
+    // Simulate network delay for smooth transition
+    setTimeout(() => {
+      if (formData.username === "admin" && formData.password === "123") {
+        onLoginSuccess?.({
+          role: "admin",
+          username: formData.username,
+        })
+      } else if (formData.username === "HSE" && formData.password === "HSE123") {
+        onLoginSuccess?.({
+          role: "petugas",
+          username: formData.username,
+        })
+      } else {
+        setIsLoading(false)
+        alert('Invalid username or password')
+      }
+    }, 600)
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#e6ecf5] px-4 py-8 sm:py-12">
+    <div className={`relative min-h-screen overflow-hidden bg-[#e6ecf5] px-4 py-8 sm:py-12 transition-opacity duration-500 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-20 left-[-120px] h-80 w-80 rounded-full bg-[#96b0d5]/25 blur-3xl" />
         <div className="absolute bottom-[-80px] right-[-90px] h-72 w-72 rounded-full bg-[#003f98]/12 blur-3xl" />
       </div>
 
       <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md items-center justify-center">
-        <div className="w-full rounded-2xl border border-[#96b0d5]/50 border-t-8 border-t-[#003f98] bg-white p-8 shadow-2xl">
+        <div className={`w-full rounded-2xl border border-[#96b0d5]/50 border-t-8 border-t-[#003f98] bg-white p-8 shadow-2xl transition-all duration-500 ${isLoading ? 'scale-95' : 'scale-100'}`}>
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[#e6ecf5] ring-1 ring-[#96b0d5]/60">
               <ShieldAlert className="h-11 w-11 text-[#003f98]" />
@@ -72,7 +78,8 @@ const LoginHSE = ({ onLoginSuccess }) => {
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
-                  className="block w-full rounded-lg border border-[#96b0d5] bg-slate-50 py-3 pl-10 pr-3 text-[#00265d] placeholder-[#96b0d5] transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#003f98]"
+                  disabled={isLoading}
+                  className="block w-full rounded-lg border border-[#96b0d5] bg-slate-50 py-3 pl-10 pr-3 text-[#00265d] placeholder-[#96b0d5] transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#003f98] disabled:opacity-60"
                   placeholder="Enter your username"
                   autoComplete="username"
                   required
@@ -94,7 +101,8 @@ const LoginHSE = ({ onLoginSuccess }) => {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="block w-full rounded-lg border border-[#96b0d5] bg-slate-50 py-3 pl-10 pr-3 text-[#00265d] placeholder-[#96b0d5] transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#003f98]"
+                  disabled={isLoading}
+                  className="block w-full rounded-lg border border-[#96b0d5] bg-slate-50 py-3 pl-10 pr-3 text-[#00265d] placeholder-[#96b0d5] transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#003f98] disabled:opacity-60"
                   placeholder="Enter your password"
                   autoComplete="current-password"
                   required
@@ -104,9 +112,17 @@ const LoginHSE = ({ onLoginSuccess }) => {
 
             <button
               type="submit"
-              className="mt-4 flex w-full justify-center rounded-lg bg-[#003f98] px-4 py-3 text-sm font-extrabold text-white shadow-md transition-colors duration-200 hover:bg-[#002c6a] focus:outline-none focus:ring-2 focus:ring-[#003f98] focus:ring-offset-2"
+              disabled={isLoading}
+              className="mt-4 flex w-full justify-center rounded-lg bg-[#003f98] px-4 py-3 text-sm font-extrabold text-white shadow-md transition-all duration-200 hover:bg-[#002c6a] focus:outline-none focus:ring-2 focus:ring-[#003f98] focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Sign In
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span>Signing in...</span>
+                </div>
+              ) : (
+                'Sign In'
+              )}
             </button>
           </form>
 
