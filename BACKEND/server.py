@@ -4,10 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 try:
     # Support both `BACKEND.server:app` and `server:app`.
     from .config import CORS_ORIGINS
-    from .routers import dashboard, health, reports, violations, active_camera
+    from .routers import dashboard, health, reports, violations, active_camera, video_feed
 except ImportError:
     from config import CORS_ORIGINS
-    from routers import dashboard, health, reports, violations, active_camera
+    from routers import dashboard, health, reports, violations, active_camera, video_feed
 
 app = FastAPI()
 
@@ -24,6 +24,7 @@ app.include_router(violations.router)
 app.include_router(dashboard.router)
 app.include_router(reports.router)
 app.include_router(active_camera.router)
+app.include_router(video_feed.router)
 
 ## Ini yang lama ya
 # from reportlab.lib.colors import HexColor, black, gray # Tambahkan ini

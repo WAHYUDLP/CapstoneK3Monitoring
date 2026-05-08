@@ -13,7 +13,7 @@ from collections import defaultdict
 IMGBB_API_KEY = "158ee9e068a89b28e5b374a664a8e192" 
 
 # Info lokasi kejadian
-SITE_LOCATION = os.environ.get("SITE_LOCATION_OVERRIDE", "Area Proyek A")
+SITE_LOCATION = os.environ.get("SITE_LOCATION_OVERRIDE", "Area 1 - Packing")
 SITE_LAT = ""
 SITE_LON = ""
 TIMEZONE_NAME = "Asia/Jakarta"
@@ -23,6 +23,9 @@ URL_BACKEND = "http://127.0.0.1:9001/report-violation"
 ACTIVE_CAMERA_URL = "http://127.0.0.1:9001/active-camera"
 _last_active_check = 0
 ACTIVE_CHECK_INTERVAL = 5.0  # seconds
+PUSH_FRAME_URL = "http://127.0.0.1:9001/api/push-frame"
+_last_push_frame = 0
+PUSH_FRAME_INTERVAL = 0.5  # seconds
 
 
 def _init_active_camera_from_backend():
@@ -240,6 +243,25 @@ while cap.isOpened():
         print("ERROR: Gagal membaca frame dari kamera.")
         break
 
+    # Periodically push a JPEG of the current frame to backend so LiveCams can display it
+    try:
+        now_push = time.time()
+        if now_push - _last_push_frame >= PUSH_FRAME_INTERVAL:
+            _last_push_frame = now_push
+            try:
+                ok, buf = cv2.imencode('.jpg', frame)
+                if ok:
+                    files = {'frame': ('frame.jpg', buf.tobytes(), 'image/jpeg')}
+                    # fire-and-forget but keep it short
+                    try:
+                        requests.post(PUSH_FRAME_URL, files=files, timeout=0.8)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     if 0 < INFERENCE_DOWNSCALE < 1.0:
         inf_w = max(1, int(frame.shape[1] * INFERENCE_DOWNSCALE))
         inf_h = max(1, int(frame.shape[0] * INFERENCE_DOWNSCALE))
@@ -358,7 +380,10 @@ while cap.isOpened():
         # 2. Lempar data (termasuk link ImgBB) ke Backend Temanmu
         if image_url: # Pastikan fotonya berhasil ke-upload dulu
             payload_be = {
-                "camera_id": SITE_LOCATION,
+                # camera_id tetap identitas kamera fisik/logical device
+                "camera_id": "CCTV 01",
+                # site_location dipakai untuk area operasional yang tampil di report/telegram
+                "site_location": SITE_LOCATION,
                 "label": vtype,
                 "image_path": image_url, # <-- Link ini yang bakal ditangkap BE
                 "id_pekerja": str(tid)

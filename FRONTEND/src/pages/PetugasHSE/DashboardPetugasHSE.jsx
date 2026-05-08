@@ -287,7 +287,7 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
     }
 
     if (activeMenu === 'Live Cams') {
-      return <LiveCamsContent />;
+      return <LiveCamsContent area={area} />;
     }
 
     if (activeMenu === 'Reports') {

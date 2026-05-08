@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class ViolationData(BaseModel):
     camera_id: str
+    site_location: Optional[str] = None
     label: str
     image_path: str
     id_pekerja: Optional[str] = "Tidak diketahui"

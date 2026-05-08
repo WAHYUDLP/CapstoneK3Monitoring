@@ -13,6 +13,10 @@ TELEGRAM_CHAT_ID = "-1003870838631"
 
 CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+# Default camera info for the M-JPEG stream endpoint
+CAMERA_ID = "CCTV 01"
+CAMERA_LOCATION = "Area 1 - Packing"
+
 COOLDOWN_SECONDS = 30
 
 LABEL_MAP = {
