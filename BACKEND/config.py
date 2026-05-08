@@ -2,11 +2,11 @@
 
 DATABASE_URL = "mysql+pymysql://root:@localhost/k3_project"
 
-#ini punya yahya
+#ini punya yahya nanti diaktifin pas presentasi atau pas ketemu
 # TELEGRAM_TOKEN = "8707229189:AAEPf1wB8XJ3b-_HieOR23qsVBi85zBKiks"
 # TELEGRAM_CHAT_ID = "-1003886366274"
 
-#ini aku nyoba sendiri mau foto
+#ini aku nyoba sendiri mau test biar ngga ganggu yahya heheh
 # Token dari BotFather (Milik @NotifK3_bot)
 TELEGRAM_TOKEN  = "8541407692:AAFBxusrjfoDsU8fHxsb_tlKc6DfYGAs3C4" 
 TELEGRAM_CHAT_ID = "-1003870838631"
@@ -14,10 +14,10 @@ TELEGRAM_CHAT_ID = "-1003870838631"
 CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 # Default camera info for the M-JPEG stream endpoint
-CAMERA_ID = "CCTV 01"
+# CAMERA_ID = "CCTV 01"
 CAMERA_LOCATION = "Area 1 - Packing"
 
-COOLDOWN_SECONDS = 30
+COOLDOWN_SECONDS = 60
 
 LABEL_MAP = {
     "not_wearing_helmet": "Tidak Memakai Helm",

@@ -379,7 +379,7 @@ while cap.isOpened():
 
         # 2. Lempar data (termasuk link ImgBB) ke Backend Temanmu
         if image_url: # Pastikan fotonya berhasil ke-upload dulu
-       
+   
             payload_be = {
                 # Gunakan variabel SITE_LOCATION agar dinamis sesuai filter di dashboard
                 "camera_id": SITE_LOCATION, 
