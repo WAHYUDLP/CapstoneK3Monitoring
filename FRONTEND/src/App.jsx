@@ -2,7 +2,7 @@ import { useState } from 'react'
 import LoginHSE from './pages/LoginHSE'
 import DashboardPetugasHSE from './pages/PetugasHSE/DashboardPetugasHSE'
 
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom"
 import AdminLayout from "./pages/AdminDashboard/adminLayout"
 import AdminDashboard from "./pages/AdminDashboard/adminDashboard"
 import AdminSystemConfig from "./pages/AdminDashboard/adminSystemconfig"
@@ -27,21 +27,57 @@ function App() {
     localStorage.removeItem('username')
   }
 
-  if (!role) {
-    return <LoginHSE onLoginSuccess={handleLoginSuccess} />
+  const getHomePath = (currentRole) => (currentRole === 'admin' ? '/admin' : '/petugas')
+
+  const RequireAuth = ({ allowedRoles, children }) => {
+    if (!role) {
+      return <Navigate to="/login" replace />
+    }
+    if (allowedRoles && !allowedRoles.includes(role)) {
+      return <Navigate to={getHomePath(role)} replace />
+    }
+    return children
   }
 
-  if (role === "petugas") {
-    return <DashboardPetugasHSE onLogout={handleLogout} username={username} />
+  const LoginRoute = () => {
+    const navigate = useNavigate()
+    if (role) {
+      return <Navigate to={getHomePath(role)} replace />
+    }
+
+    const handleLogin = (authData) => {
+      handleLoginSuccess(authData)
+      navigate(getHomePath(authData.role), { replace: true })
+    }
+
+    return <LoginHSE onLoginSuccess={handleLogin} />
   }
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<AdminLayout onLogout={handleLogout} username={username} />}>
+        <Route path="/" element={<Navigate to={role ? getHomePath(role) : '/login'} replace />} />
+        <Route path="/login" element={<LoginRoute />} />
+        <Route
+          path="/petugas"
+          element={
+            <RequireAuth allowedRoles={['petugas']}>
+              <DashboardPetugasHSE onLogout={handleLogout} username={username} />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireAuth allowedRoles={['admin']}>
+              <AdminLayout onLogout={handleLogout} username={username} />
+            </RequireAuth>
+          }
+        >
           <Route index element={<AdminDashboard />} />
           <Route path="system-config" element={<AdminSystemConfig />} />
         </Route>
+        <Route path="*" element={<Navigate to={role ? getHomePath(role) : '/login'} replace />} />
       </Routes>
     </BrowserRouter>
   )

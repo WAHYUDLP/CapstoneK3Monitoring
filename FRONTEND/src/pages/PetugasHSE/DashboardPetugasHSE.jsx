@@ -558,11 +558,11 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
         </button>
       </aside>
 
-      <main className={`flex-1 p-10 ${activeMenu === 'Logs' ? 'overflow-hidden' : 'overflow-y-auto'} transition-all duration-300 ${isPageTransitioning || isLoggingOut ? 'opacity-50' : 'opacity-100'}`}>
+      <main className={`flex-1 min-h-0 p-8 ${activeMenu === 'Logs' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'} transition-all duration-300 ${isPageTransitioning || isLoggingOut ? 'opacity-50' : 'opacity-100'}`}>
         {isDashboardLoading && activeMenu === 'Dashboard' ? (
           <div className="mb-4 text-sm font-medium text-[#6b90c3]">Loading dashboard data...</div>
         ) : null}
-        <div className={`transition-opacity duration-300 ${isPageTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+        <div className={`transition-opacity duration-300 ${activeMenu === 'Logs' ? 'flex-1 min-h-0' : ''} ${isPageTransitioning ? 'opacity-0' : 'opacity-100'}`}>
           {renderMainContent()}
         </div>
       </main>
