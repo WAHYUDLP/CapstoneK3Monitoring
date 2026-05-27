@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { fetchDashboardSummary, ping } from '../../api';
-import { Calendar, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import LogsContent from './Logs';
 import LiveCamsContent from './LiveCamsContent';
 import ReportsContent from './Report';
@@ -381,7 +381,6 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
                 <div>
                   <label className="mb-1 block text-sm text-white/90">Start Date</label>
                   <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
-                    <Calendar className="h-4 w-4 shrink-0 text-white" />
                     <input
                       type="date"
                       value={reportDraft.startDate}
@@ -394,7 +393,6 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
                 <div>
                   <label className="mb-1 block text-sm text-white/90">End Date</label>
                   <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
-                    <Calendar className="h-4 w-4 shrink-0 text-white" />
                     <input
                       type="date"
                       value={reportDraft.endDate}
@@ -453,7 +451,6 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
                 <div>
                   <label className="mb-1 block text-sm text-white/90">Start Date</label>
                   <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
-                    <Calendar className="h-4 w-4 shrink-0 text-white" />
                     <input
                       type="date"
                       value={logsStartDate}
@@ -466,7 +463,6 @@ const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
                 <div>
                   <label className="mb-1 block text-sm text-white/90">End Date</label>
                   <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
-                    <Calendar className="h-4 w-4 shrink-0 text-white" />
                     <input
                       type="date"
                       value={logsEndDate}
