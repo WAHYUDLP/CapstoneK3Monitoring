@@ -14,6 +14,14 @@ http://127.0.0.1:9001
 3. Install dependency frontend dengan `npm install`.
 4. Jalankan frontend dengan `npm run dev`.
 
+Contoh perintah dari root project:
+
+```powershell
+cd FRONTEND
+npm install
+npm run dev
+```
+
 ## Konfigurasi Backend
 Kalau perlu ganti alamat backend, buat file `.env` di folder `FRONTEND`:
 

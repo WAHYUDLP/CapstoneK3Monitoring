@@ -20,6 +20,15 @@ Backend ini menangani:
 
 ## Cara Menjalankan Backend di Windows
 
+### Ringkas (recommended)
+Jalankan dari root project:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+& ".\MODEL\.venv\Scripts\Activate.ps1"
+.\MODEL\.venv\Scripts\python.exe -m uvicorn BACKEND.server:app --host 127.0.0.1 --port 9001
+```
+
 ### 1. Buka terminal di root project
 Pastikan posisi folder kerja ada di:
 `CapstoneK3Monitoring`
@@ -48,13 +57,15 @@ Kalau kamu menjalankan dari root project, pakai:
 Kalau kamu pakai VS Code, pastikan interpreter Python yang aktif mengarah ke `MODEL/.venv`.
 
 ### 4. Jalankan server FastAPI
-Kalau terminal kamu sedang di folder `BACKEND`, jalankan:
+Pilih salah satu sesuai posisi terminalmu:
+
+Kalau terminal kamu sedang di folder `BACKEND`:
 
 ```powershell
 ..\MODEL\.venv\Scripts\python.exe -m uvicorn server:app --host 127.0.0.1 --port 9001
 ```
 
-Kalau kamu menjalankan dari root project, pakai:
+Kalau kamu menjalankan dari root project:
 
 ```powershell
 .\MODEL\.venv\Scripts\python.exe -m uvicorn BACKEND.server:app --host 127.0.0.1 --port 9001
@@ -66,8 +77,24 @@ Kalau kamu butuh auto-reload saat ngoding, coba tambahkan `--reload` setelah ser
 
 ### 5. Cek server
 Buka endpoint berikut di browser atau Postman:
-- `http://127.0.0.1:8000/ping`
-- `http://127.0.0.1:8000/docs`
+- `http://127.0.0.1:9001/ping`
+- `http://127.0.0.1:9001/docs`
+
+## Menjalankan Kamera / Model
+Script kamera berada di folder `MODEL`. Jalankan dari root project:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+& ".\MODEL\.venv\Scripts\Activate.ps1"
+.\MODEL\.venv\Scripts\python.exe .\MODEL\mainWithLinkImgb.py
+```
+
+Atau jika sudah berada di folder `MODEL`:
+
+```powershell
+cd MODEL
+.\.venv\Scripts\python.exe mainWithLinkImgb.py
+```
 
 ## Endpoint Utama
 - `POST /report-violation`

@@ -174,14 +174,14 @@ const LogsContent = ({ filterStartDate = '', filterEndDate = '', filterArea = 'A
         <div className={`flex-1 min-h-0 overflow-x-auto overflow-y-auto transition-opacity duration-300 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
           <table className="w-full text-left border-collapse min-w-[800px]">
             {/* Table header */}
-            <thead className="bg-[#f4f7fb]">
+            <thead className="bg-[#f4f7fb] sticky top-0 z-10">
               <tr>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[5%]">No.</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Area</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Date</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Time</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[20%]">Violation</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[30%]">Evidence</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[5%]">No.</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Area</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Date</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Time</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[20%]">Violation</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[30%]">Evidence</th>
               </tr>
             </thead>
             
@@ -189,22 +189,22 @@ const LogsContent = ({ filterStartDate = '', filterEndDate = '', filterArea = 'A
             <tbody className="divide-y divide-[#e6ecf5]">
               {paginatedRows.map((log, idx) => (
                 <tr key={log.id || idx} className="hover:bg-[#f0f4f9] transition-colors duration-200">
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#00265d]">{(currentPage - 1) * pageSize + idx + 1}</td>
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#00265d]">{log.area}</td>
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#6b90c3]">{log.date}</td>
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#6b90c3]">{log.time}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-1.5 text-[14px] font-medium text-[#00265d]">{(currentPage - 1) * pageSize + idx + 1}</td>
+                  <td className="px-6 py-1.5 text-[14px] font-medium text-[#00265d]">{log.area}</td>
+                  <td className="px-6 py-1.5 text-[14px] font-medium text-[#6b90c3]">{log.date}</td>
+                  <td className="px-6 py-1.5 text-[14px] font-medium text-[#6b90c3]">{log.time}</td>
+                  <td className="px-6 py-1.5">
                     {/* Violation badge */}
                     <div className="flex flex-col">
-                      <span className="inline-flex w-fit items-center px-2.5 py-1 rounded-md text-[13px] font-semibold bg-[#e6ecf5] text-[#003f98] border border-[#c8d6ea]">
+                      <span className="inline-flex w-fit items-center px-2 py-0.5 rounded text-[12px] font-semibold bg-[#e6ecf5] text-[#003f98] border border-[#c8d6ea]">
                         {log.violationCode}
                       </span>
-                      <span className="mt-1 text-[12px] text-[#6b90c3]">
+                      <span className="mt-0.5 text-[11px] text-[#6b90c3]">
                         {log.violationLabel}
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-1.5">
                     <a
                       href={log.evidenceUrl || '#'}
                       target={log.evidenceUrl ? '_blank' : undefined}

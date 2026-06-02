@@ -82,6 +82,8 @@ const ReportsContent = ({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const reportPaperRef = useRef(null);
 
+  const hasViolations = logs.length > 0;
+
   const storageKey = `hse-report-draft:${filterStartDate}:${filterEndDate}:${filterShift}:${filterArea}`;
 
   // 2. HANDLERS
@@ -212,7 +214,20 @@ const ReportsContent = ({
     });
   };
 
+  const ensureReportReady = () => {
+    if (isLoadingViolations) {
+      alert('Data pelanggaran masih dimuat. Coba lagi sebentar.');
+      return false;
+    }
+    if (!hasViolations) {
+      alert('Tidak ada data pelanggaran untuk periode ini.');
+      return false;
+    }
+    return true;
+  };
+
   const handlePreviewPdf = async () => {
+    if (!ensureReportReady()) return;
     try {
       setIsGeneratingPdf(true);
       const blob = await buildPdfBlob();
@@ -240,6 +255,7 @@ const ReportsContent = ({
   };
 
   const handleDownloadPdf = async () => {
+    if (!ensureReportReady()) return;
     try {
       setIsGeneratingPdf(true);
       const blob = await buildPdfBlob();
@@ -301,16 +317,16 @@ const ReportsContent = ({
         <button
           type="button"
           onClick={handlePreviewPdf}
-          disabled={isGeneratingPdf}
-          className="flex items-center gap-2 bg-white text-[#00265d] border border-[#00265d] px-4 py-2 rounded-md font-semibold hover:bg-gray-50 transition-colors shadow-sm"
+          disabled={isGeneratingPdf || isLoadingViolations || !hasViolations}
+          className="flex items-center gap-2 bg-white text-[#00265d] border border-[#00265d] px-4 py-2 rounded-md font-semibold hover:bg-gray-50 transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
         >
           <FileSearch className="w-4 h-4" /> {isGeneratingPdf ? 'Membuat PDF...' : 'Preview PDF'}
         </button>
         <button
           type="button"
           onClick={handleDownloadPdf}
-          disabled={isGeneratingPdf}
-          className="flex items-center gap-2 bg-[#003f98] text-white px-4 py-2 rounded-md font-semibold hover:bg-[#002c6a] transition-colors shadow-md"
+          disabled={isGeneratingPdf || isLoadingViolations || !hasViolations}
+          className="flex items-center gap-2 bg-[#003f98] text-white px-4 py-2 rounded-md font-semibold hover:bg-[#002c6a] transition-colors shadow-md disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Download className="w-4 h-4" /> {isGeneratingPdf ? 'Membuat PDF...' : 'Unduh PDF'}
         </button>
