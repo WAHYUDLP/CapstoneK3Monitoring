@@ -7,6 +7,7 @@ Backend ini menangani:
 - pengiriman notifikasi Telegram
 - dashboard summary
 - generate laporan PDF
+- memantau kesehatan hardware server (CPU, RAM, Storage) secara real-time
 
 ## Struktur Singkat
 - `server.py` = entrypoint utama FastAPI
@@ -74,6 +75,7 @@ Buka endpoint berikut di browser atau Postman:
 - `GET /violations`
 - `GET /dashboard-summary`
 - `POST /report-pdf`
+- `GET /api/system-usage`
 
 ## Catatan
 - Pastikan MySQL aktif dan database `k3_project` sudah tersedia.
