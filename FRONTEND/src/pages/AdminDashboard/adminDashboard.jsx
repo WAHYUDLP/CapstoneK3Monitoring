@@ -40,6 +40,7 @@ function AdminDashboard() {
   return (
     <div
       className="container"
+      
       style={{
         marginLeft: "303px",
         width: "calc(100% - 303px)",
@@ -49,7 +50,7 @@ function AdminDashboard() {
         boxSizing: "border-box",
       }}
     >
-      <div className="content-wrapper">
+      <div className="content-wrapper" >
         {/* TOP CARDS */}
         <div className="top-cards">
 
@@ -63,20 +64,20 @@ function AdminDashboard() {
           </div> */}
 
           <div className="card">
-            <h3 style={{ marginBottom: "40px" }}>Active Device</h3>
-            <h1>
-              1<span style={{ color: "#1e3a8a" }}>/3</span>
+            <h3 className="section-title" style={{ marginBottom: "40px" }}>Active Device</h3>
+            <h1 className="section-title">
+              1<span style={{ color: "#1e3a8a" }} >/3</span>
             </h1>
             <p className="green">Online</p>
           </div>
 
 
           <div className="card">
-            <h3 style={{ marginBottom: "40px" }}>API Status</h3>
-            <p style={{ fontSize: 20, color: "#2B60AA" }}>
+            <h3 className="section-title" style={{ marginBottom: "40px" }}>API Status</h3>
+            <p  style={{ fontSize: 20, color: "#2B60AA" }}>
               <span className={`dot ${systemData.api_status.telegram === "success" ? "green-bg" : "red-bg"}`}></span> Telegram
             </p>
-            <p style={{ fontSize: 20, color: "#2B60AA" }}>
+            <p  style={{ fontSize: 20, color: "#2B60AA" }}>
               <span className={`dot ${systemData.api_status.imgbb === "success" ? "green-bg" : "red-bg"}`}></span> ImgBB
             </p>
           </div>
@@ -86,7 +87,7 @@ function AdminDashboard() {
         <div className="bottom-section">
           {/* SYSTEM USAGE */}
           <div className="card large" style={{ color: "#1E3A8A", flex: 1.5 }}>
-            <h3 style={{ marginBottom: "40px" }}>System Usage</h3>
+            <h3 className="section-title" style={{ marginBottom: "40px" }}>System Usage</h3>
             <div className="usage">
               
               {/* LINGKARAN MEMORY (Udah Live dari Backend) */}
