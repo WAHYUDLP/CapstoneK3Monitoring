@@ -3,7 +3,12 @@ import "../../App.css";
 
 function AdminDashboard() {
   // 1. STATE BUAT NAMPUNG DATA CPU & RAM DARI BACKEND
-  const [systemData, setSystemData] = useState({ cpu: 0, memory: 0, storage: 0 });
+  const [systemData, setSystemData] = useState({ 
+    cpu: 0, 
+    memory: 0, 
+    storage: 0, 
+    api_status: { telegram: "failed", imgbb: "failed" }
+  });
 
   // 2. SHORT POLLING: Narik data dari server tiap 3 detik
   useEffect(() => {
@@ -17,7 +22,8 @@ function AdminDashboard() {
           setSystemData({
             cpu: Math.round(result.data.cpu_percent),
             memory: Math.round(result.data.memory_percent),
-            storage: Math.round(result.data.storage_percent)
+            storage: Math.round(result.data.storage_percent),
+            api_status: result.data.api_status || { telegram: "failed", imgbb: "failed" }
           });
         }
       } catch (error) {
@@ -65,10 +71,10 @@ function AdminDashboard() {
           <div className="card">
             <h3 style={{ marginBottom: "40px" }}>API Status</h3>
             <p style={{ fontSize: 20, color: "#2B60AA" }}>
-              <span className="dot green-bg"></span> Telegram
+              <span className={`dot ${systemData.api_status.telegram === "success" ? "green-bg" : "red-bg"}`}></span> Telegram
             </p>
             <p style={{ fontSize: 20, color: "#2B60AA" }}>
-              <span className="dot red-bg"></span> ImgBB
+              <span className={`dot ${systemData.api_status.imgbb === "success" ? "green-bg" : "red-bg"}`}></span> ImgBB
             </p>
           </div>
         </div>

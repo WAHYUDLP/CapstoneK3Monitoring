@@ -128,7 +128,7 @@ function AdminSystemConfig() {
 
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <input
-            placeholder="ex: 8541407692:AAFBxusrjfoDsU8fHxsb_tlKc6DfYGAs3C4"
+            placeholder="Insert Telegram Token Here"
             value={telegramToken}
             onChange={(e) => {
               setTelegramToken(e.target.value);
@@ -182,7 +182,7 @@ function AdminSystemConfig() {
 
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <input
-            placeholder="ex: 158ee9e068a89b28e5b374a664a8e192"
+            placeholder="Insert API DB Here"
             value={imgbbApiKey}
             onChange={(e) => {
               setImgbbApiKey(e.target.value);
