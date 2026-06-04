@@ -27,10 +27,30 @@ def _read_env_file_value(key_name, env_path=".env"):
         return ""
     return ""
 
-IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "").strip() or _read_env_file_value("IMGBB_API_KEY")
+import sys
+
+# Cari path ke folder BACKEND dan import config.py
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if os.path.basename(script_dir) == "MODEL":
+    backend_dir = os.path.join(os.path.dirname(script_dir), "BACKEND")
+elif os.path.basename(script_dir) == "BACKEND":
+    backend_dir = script_dir
+else:
+    backend_dir = os.path.join(script_dir, "BACKEND")
+
+sys.path.append(backend_dir)
+
+try:
+    import config
+    IMGBB_API_KEY = getattr(config, "IMGBB_API_KEY", "").strip()
+except ImportError:
+    IMGBB_API_KEY = ""
+
 if not IMGBB_API_KEY:
-    print("ERROR: IMGBB_API_KEY belum diset.")
-    print("Isi di environment variable atau file .env (IMGBB_API_KEY=your_key).")
+    IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "").strip() or _read_env_file_value("IMGBB_API_KEY")
+
+if not IMGBB_API_KEY:
+    print("ERROR: IMGBB_API_KEY belum diset di config.py, .env, atau environment variable.")
     raise SystemExit(1)
 
 # Info lokasi kejadian (isi sesuai lokasi proyek)
@@ -41,10 +61,16 @@ TIMEZONE_NAME = "Asia/Jakarta"
 
 # URL Backend Temanmu
 # PERHATIAN: Kalau beda laptop, ganti "localhost" dengan IP WiFi temanmu! (misal: 192.168.1.10)
-URL_BACKEND = "http://localhost:8000/report-violation"
+URL_BACKEND = "http://localhost:9001/report-violation"
+SYSTEM_CONFIG_URL = "http://localhost:9001/api/system-config"
+_last_config_check = 0
+CONFIG_CHECK_INTERVAL = 5.0  # seconds
 
 # --- INISIALISASI MODEL ---
-model = YOLO('best.pt')
+# Load model relatif terhadap direktori script agar bisa dijalankan dari mana saja
+script_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(script_dir, "best.pt")
+model = YOLO(model_path)
 # Fallback ID (kalau auto-resolve gagal)
 APD_CLASS_MAP = {0: "helmet", 1: "mask", 7: "vest"}
 PERSON_CLASS_ID = 5
@@ -219,6 +245,34 @@ print("Kontrol runtime: 'p' pause/resume, 's' split view, 'q' quit")
 print("=== SISTEM MONITORING K3 AKTIF ===")
 
 while cap.isOpened():
+    try:
+        now_ts = time.time()
+        if now_ts - _last_config_check >= CONFIG_CHECK_INTERVAL:
+            _last_config_check = now_ts
+            try:
+                resp_cfg = requests.get(SYSTEM_CONFIG_URL, timeout=1.0)
+                if resp_cfg.status_code == 200:
+                    cfg_json = resp_cfg.json()
+                    if cfg_json.get("status") == "success" and "data" in cfg_json:
+                        data = cfg_json["data"]
+                        CONF_THRESHOLD = float(data.get("confidence_threshold", CONF_THRESHOLD))
+                        PERSON_CONF_THRESHOLD = CONF_THRESHOLD
+                        APD_CONF_THRESHOLD["mask"] = CONF_THRESHOLD
+                        APD_CONF_THRESHOLD["helmet"] = min(0.95, CONF_THRESHOLD * 2.0)
+                        APD_CONF_THRESHOLD["vest"] = min(0.95, CONF_THRESHOLD * 2.0)
+                        
+                        APD_PERSON_IOU_THRESHOLD = float(data.get("iou_threshold", APD_PERSON_IOU_THRESHOLD))
+                        
+                        min_frames = int(data.get("min_detection_frames", NEVER_WEAR_FRAMES))
+                        NEVER_WEAR_FRAMES = min_frames
+                        MISSING_FRAMES_THRESHOLD = min_frames * 2
+                        
+                        TELEGRAM_RENOTIFY_INTERVAL_SEC = int(data.get("cooldown_seconds", TELEGRAM_RENOTIFY_INTERVAL_SEC))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     success, frame = cap.read()
     if not success:
         print("ERROR: Gagal membaca frame dari kamera.")

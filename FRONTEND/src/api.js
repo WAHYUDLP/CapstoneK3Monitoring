@@ -84,4 +84,35 @@ export async function fetchDashboardSummary({ period = 'Today', shift = 'All', a
   }
 }
 
-export default { ping, fetchViolations, fetchViolationsFiltered, fetchReportPdf, reportViolation, fetchDashboardSummary };
+export async function fetchSystemConfig() {
+  try {
+    const res = await fetch(`${API_BASE}/api/system-config`);
+    if (!res.ok) throw new Error('Network response not ok');
+    const payload = await res.json();
+    if (payload.status === 'success') return payload.data;
+    throw new Error(payload.message || 'Failed to fetch config');
+  } catch (err) {
+    console.error('fetchSystemConfig error:', err);
+    return null;
+  }
+}
+
+export async function updateSystemConfig(payload) {
+  try {
+    const res = await fetch(`${API_BASE}/api/system-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errPayload = await res.json().catch(() => ({}));
+      throw new Error(errPayload.detail || 'Failed to update config');
+    }
+    return await res.json();
+  } catch (err) {
+    console.error('updateSystemConfig error:', err);
+    return { status: 'error', message: err.message };
+  }
+}
+
+export default { ping, fetchViolations, fetchViolationsFiltered, fetchReportPdf, reportViolation, fetchDashboardSummary, fetchSystemConfig, updateSystemConfig };

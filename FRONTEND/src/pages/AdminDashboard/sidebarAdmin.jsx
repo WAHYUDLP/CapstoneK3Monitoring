@@ -85,7 +85,8 @@ function Sidebar({ onLogout, username = 'Admin' }) {
           }}
         >
           <NavLink
-            to="/"
+            to="/admin"
+            end
             style={({ isActive }) => ({
               textDecoration: "none",
               color: "#E6ECF5",
@@ -100,7 +101,7 @@ function Sidebar({ onLogout, username = 'Admin' }) {
           </NavLink>
 
           <NavLink
-            to="/system-config"
+            to="/admin/system-config"
             style={({ isActive }) => ({
               textDecoration: "none",
               color: "#E6ECF5",

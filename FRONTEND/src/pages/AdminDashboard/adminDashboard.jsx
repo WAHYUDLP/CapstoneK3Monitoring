@@ -9,7 +9,7 @@ function AdminDashboard() {
   useEffect(() => {
     const fetchSystemUsage = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/system-usage");
+        const response = await fetch("http://localhost:9001/api/system-usage");
         const result = await response.json();
         
         if (result.status === "success") {

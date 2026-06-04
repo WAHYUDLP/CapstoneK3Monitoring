@@ -1,0 +1,6 @@
+{
+    "confidence_threshold": 0.67,
+    "iou_threshold": 0.05,
+    "min_detection_frames": 15,
+    "cooldown_seconds": 150
+}

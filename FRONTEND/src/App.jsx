@@ -5,7 +5,7 @@ import DashboardPetugasHSE from './pages/PetugasHSE/DashboardPetugasHSE'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom"
 import AdminLayout from "./pages/AdminDashboard/adminLayout"
 import AdminDashboard from "./pages/AdminDashboard/adminDashboard"
-import AdminSystemConfig from "./pages/AdminDashboard/adminSystemconfig"
+import AdminSystemConfig from "./pages/AdminDashboard/adminSystemConfig"
 
 function App() {
   // Use lazy initialization to read from localStorage without useEffect
