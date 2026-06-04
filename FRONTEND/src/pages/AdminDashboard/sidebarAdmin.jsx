@@ -55,7 +55,7 @@ function Sidebar({ onLogout, username = 'Admin' }) {
 
         {/* NAMA */}
         <div style={{ marginTop: "15px" }}>
-          <p style={{ margin: 0, fontSize: "18px" }}>Hello,</p>
+          {/* <p style={{ margin: 0, fontSize: "18px" }}>Hello,</p> */}
           <p
             style={{
               margin: 0,
@@ -63,7 +63,8 @@ function Sidebar({ onLogout, username = 'Admin' }) {
               fontWeight: "bold",
             }}
           >
-            {username}
+            {/* {username} */}
+            {username.charAt(0).toUpperCase() + username.slice(1)}
           </p>
         </div>
 
