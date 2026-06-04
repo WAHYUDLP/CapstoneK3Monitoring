@@ -52,7 +52,7 @@ function AdminDashboard() {
       <div className="content-wrapper">
         {/* TOP CARDS */}
         <div className="top-cards">
-          <div className="card">
+          {/* <div className="card">
             <h3 style={{ marginBottom: "40px" }}>System Downtime</h3>
             <h1>0h23m</h1>
             <p>
@@ -66,7 +66,7 @@ function AdminDashboard() {
               32<span style={{ color: "#1e3a8a" }}>/64</span>
             </h1>
             <p className="green">Online</p>
-          </div>
+          </div> */}
 
           <div className="card">
             <h3 style={{ marginBottom: "40px" }}>API Status</h3>
@@ -120,10 +120,10 @@ function AdminDashboard() {
           </div>
 
           {/* API CHART (fake bar) */}
-          <div className="card large">
+          {/* <div className="card large">
             <h3 style={{ marginBottom: "20px" }}>API Request Success Rate</h3>
             <div className="chart-container">
-              {/* CHART */}
+
               <div className="chart">
                 <div className="bar-group">
                   <div className="bar-stack">
@@ -142,7 +142,6 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              {/* SIDE INFO */}
               <div className="side-info">
                 <div className="mini-card">
                   <p>
@@ -167,7 +166,7 @@ function AdminDashboard() {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
