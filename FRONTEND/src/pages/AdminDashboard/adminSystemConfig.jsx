@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "../../App.css";
-import { fetchSystemConfig, updateSystemConfig } from "../../api";
+import { fetchSystemConfig, updateSystemConfig, testTelegramConnection, testImgbbConnection } from "../../api";
 
 function AdminSystemConfig() {
   const [config, setConfig] = useState({
@@ -9,6 +9,12 @@ function AdminSystemConfig() {
     min_detection_frames: 5,
     cooldown_seconds: 120,
   });
+  
+  const [telegramToken, setTelegramToken] = useState("");
+  const [imgbbApiKey, setImgbbApiKey] = useState("");
+  
+  const [telegramTestStatus, setTelegramTestStatus] = useState(""); // "", "loading", "successful", "failed"
+  const [imgbbTestStatus, setImgbbTestStatus] = useState(""); // "", "loading", "successful", "failed"
   
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState({ type: "", message: "" });
@@ -19,6 +25,8 @@ function AdminSystemConfig() {
         const data = await fetchSystemConfig();
         if (data) {
           setConfig(data);
+          setTelegramToken(data.telegram_token || "");
+          setImgbbApiKey(data.imgbb_api_key || "");
         }
       } catch (err) {
         console.error("Gagal memuat konfigurasi:", err);
@@ -29,6 +37,34 @@ function AdminSystemConfig() {
     loadConfig();
   }, []);
 
+  const handleTestTelegram = async () => {
+    setTelegramTestStatus("loading");
+    try {
+      const res = await testTelegramConnection(telegramToken);
+      if (res && res.status === "success") {
+        setTelegramTestStatus("successful");
+      } else {
+        setTelegramTestStatus("failed");
+      }
+    } catch (err) {
+      setTelegramTestStatus("failed");
+    }
+  };
+
+  const handleTestImgbb = async () => {
+    setImgbbTestStatus("loading");
+    try {
+      const res = await testImgbbConnection(imgbbApiKey);
+      if (res && res.status === "success") {
+        setImgbbTestStatus("successful");
+      } else {
+        setImgbbTestStatus("failed");
+      }
+    } catch (err) {
+      setImgbbTestStatus("failed");
+    }
+  };
+
   const handleSaveSettings = async () => {
     setSaveStatus({ type: "loading", message: "Menyimpan pengaturan..." });
     
@@ -37,9 +73,11 @@ function AdminSystemConfig() {
       iou_threshold: parseFloat(config.iou_threshold),
       min_detection_frames: parseInt(config.min_detection_frames),
       cooldown_seconds: parseInt(config.cooldown_seconds),
+      telegram_token: telegramToken,
+      imgbb_api_key: imgbbApiKey,
     };
 
-    // Validasi input
+    // Validasi input threshold
     if (isNaN(payload.confidence_threshold) || payload.confidence_threshold < 0 || payload.confidence_threshold > 1) {
       setSaveStatus({ type: "error", message: "Confidence threshold harus di antara 0 dan 1" });
       return;
@@ -88,80 +126,108 @@ function AdminSystemConfig() {
       <div className="text-primary" style={{ marginTop: "20px" }}>
         <p className="section" style={{marginBottom: "5px"}}>Telegram</p>
 
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <input
-            placeholder="ex: https://api.imgbb.com/1/upload"
-            disabled
+            placeholder="ex: 8541407692:AAFBxusrjfoDsU8fHxsb_tlKc6DfYGAs3C4"
+            value={telegramToken}
+            onChange={(e) => {
+              setTelegramToken(e.target.value);
+              setTelegramTestStatus(""); // Reset status on edit
+            }}
             style={{
               width: "50%",
               padding: "10px",
               borderRadius: "10px",
               border: "1px solid #003F98",
               background: "#E6ECF5",
-              opacity: 0.7,
+              color: "#003F98",
+              fontWeight: "bold",
             }}
           />
 
           <button
-            disabled
+            onClick={handleTestTelegram}
+            disabled={telegramTestStatus === "loading"}
             style={{
               background: "#003F98",
               color: "#E6ECF5",
               border: "none",
               padding: "10px 20px",
               borderRadius: "10px",
-              cursor: "not-allowed",
-              opacity: 0.7,
+              cursor: telegramTestStatus === "loading" ? "not-allowed" : "pointer",
+              fontWeight: "bold",
             }}
           >
-            Test Connection
+            {telegramTestStatus === "loading" ? "Testing..." : "Test Connection"}
           </button>
         </div>
 
-        <p>
-          Test Connection was{" "}
-          <span style={{ color: "green" }}>successful</span>
-        </p>
+        {telegramTestStatus === "successful" && (
+          <p style={{ marginTop: "5px", fontSize: "14px" }}>
+            Test Connection was{" "}
+            <span style={{ color: "green", fontWeight: "bold" }}>successful</span>
+          </p>
+        )}
+        {telegramTestStatus === "failed" && (
+          <p style={{ marginTop: "5px", fontSize: "14px" }}>
+            Test Connection was{" "}
+            <span style={{ color: "red", fontWeight: "bold" }}>failed</span>
+          </p>
+        )}
       </div>
 
-      {/* IMGBB */}
+      {/* DATABASE (IMGBB API KEY) */}
       <div className="text-primary" style={{ marginTop: "20px" }}>
-        <p className="section"style={{marginBottom: "5px"}}>ImgBB</p>
+        <p className="section" style={{marginBottom: "5px"}}>Database</p>
 
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <input
-            placeholder="ex: https://api.imgbb.com/1/upload"
-            disabled
+            placeholder="ex: 158ee9e068a89b28e5b374a664a8e192"
+            value={imgbbApiKey}
+            onChange={(e) => {
+              setImgbbApiKey(e.target.value);
+              setImgbbTestStatus(""); // Reset status on edit
+            }}
             style={{
               width: "50%",
               padding: "10px",
               borderRadius: "10px",
               border: "1px solid #003F98",
               background: "#E6ECF5",
-              opacity: 0.7,
+              color: "#003F98",
+              fontWeight: "bold",
             }}
           />
 
           <button
-            disabled
+            onClick={handleTestImgbb}
+            disabled={imgbbTestStatus === "loading"}
             style={{
               background: "#003F98",
               color: "#E6ECF5",
               border: "none",
               padding: "10px 20px",
               borderRadius: "10px",
-              cursor: "not-allowed",
-              opacity: 0.7,
+              cursor: imgbbTestStatus === "loading" ? "not-allowed" : "pointer",
+              fontWeight: "bold",
             }}
           >
-            Test Connection
+            {imgbbTestStatus === "loading" ? "Testing..." : "Test Connection"}
           </button>
         </div>
 
-        <p>
-          Test Connection was{" "}
-          <span style={{ color: "red" }}>failed</span>
-        </p>
+        {imgbbTestStatus === "successful" && (
+          <p style={{ marginTop: "5px", fontSize: "14px" }}>
+            Test Connection was{" "}
+            <span style={{ color: "green", fontWeight: "bold" }}>successful</span>
+          </p>
+        )}
+        {imgbbTestStatus === "failed" && (
+          <p style={{ marginTop: "5px", fontSize: "14px" }}>
+            Test Connection was{" "}
+            <span style={{ color: "red", fontWeight: "bold" }}>failed</span>
+          </p>
+        )}
       </div>
 
       {/* DETECTION SETTINGS */}

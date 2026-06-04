@@ -115,4 +115,34 @@ export async function updateSystemConfig(payload) {
   }
 }
 
-export default { ping, fetchViolations, fetchViolationsFiltered, fetchReportPdf, reportViolation, fetchDashboardSummary, fetchSystemConfig, updateSystemConfig };
+export async function testTelegramConnection(token) {
+  try {
+    const res = await fetch(`${API_BASE}/api/test-telegram`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    if (!res.ok) throw new Error('Network response not ok');
+    return await res.json();
+  } catch (err) {
+    console.error('testTelegramConnection error:', err);
+    return { status: 'failed', message: err.message };
+  }
+}
+
+export async function testImgbbConnection(key) {
+  try {
+    const res = await fetch(`${API_BASE}/api/test-imgbb`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    if (!res.ok) throw new Error('Network response not ok');
+    return await res.json();
+  } catch (err) {
+    console.error('testImgbbConnection error:', err);
+    return { status: 'failed', message: err.message };
+  }
+}
+
+export default { ping, fetchViolations, fetchViolationsFiltered, fetchReportPdf, reportViolation, fetchDashboardSummary, fetchSystemConfig, updateSystemConfig, testTelegramConnection, testImgbbConnection };

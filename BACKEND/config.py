@@ -54,3 +54,19 @@ PPE_LABEL_MAP = {
     "PPE-06": "Mencoba Melepas Rompi",
     "PPE-07": "Mencoba Melepas Masker",
 }
+
+# DYNAMIC OVERRIDES FROM system_config.json
+import os
+import json
+_CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
+_CONFIG_PATH = os.path.join(_CONFIG_DIR, "system_config.json")
+if os.path.exists(_CONFIG_PATH):
+    try:
+        with open(_CONFIG_PATH, "r") as _f:
+            _data = json.load(_f)
+            if "telegram_token" in _data and _data["telegram_token"]:
+                TELEGRAM_TOKEN = _data["telegram_token"]
+            if "imgbb_api_key" in _data and _data["imgbb_api_key"]:
+                IMGBB_API_KEY = _data["imgbb_api_key"]
+    except Exception as _e:
+        print(f"Error overriding config values from JSON: {_e}")
