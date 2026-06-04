@@ -52,21 +52,24 @@ function AdminDashboard() {
       <div className="content-wrapper">
         {/* TOP CARDS */}
         <div className="top-cards">
+
+          {/* untuk active device sama shutdown time jadi dipakai kah? */}
           {/* <div className="card">
             <h3 style={{ marginBottom: "40px" }}>System Downtime</h3>
             <h1>0h23m</h1>
             <p>
               <span style={{ color: "green" }}>+5%</span> vs last week
             </p>
-          </div>
+          </div> */}
 
           <div className="card">
             <h3 style={{ marginBottom: "40px" }}>Active Device</h3>
             <h1>
-              32<span style={{ color: "#1e3a8a" }}>/64</span>
+              1<span style={{ color: "#1e3a8a" }}>/3</span>
             </h1>
             <p className="green">Online</p>
-          </div> */}
+          </div>
+
 
           <div className="card">
             <h3 style={{ marginBottom: "40px" }}>API Status</h3>
@@ -119,6 +122,7 @@ function AdminDashboard() {
             </div>
           </div>
 
+          {/* untuk api request succest rate jadi dipakai kah? */}
           {/* API CHART (fake bar) */}
           {/* <div className="card large">
             <h3 style={{ marginBottom: "20px" }}>API Request Success Rate</h3>
@@ -167,6 +171,8 @@ function AdminDashboard() {
               </div>
             </div>
           </div> */}
+
+
         </div>
       </div>
     </div>
