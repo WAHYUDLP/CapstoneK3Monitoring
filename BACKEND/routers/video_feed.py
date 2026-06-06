@@ -90,35 +90,66 @@ def _draw_predictions(frame):
     return frame
 
 
-def generate_frames():
-    frame_file = Path(__file__).resolve().parents[1] / "tmp" / "last_frame.jpg"
+def generate_frames(camera_id: str = "1"):
+    from routers.system_config import load_config
+    try:
+        config = load_config()
+        camera_map = config.get("camera_map", {})
+        source = camera_map.get(str(camera_id), "")
+    except Exception:
+        source = ""
+        
+    source = source.strip()
+    if source.startswith("http"):
+        if source.endswith(":4747") or source.endswith(":4747/"):
+            source = source.rstrip("/") + "/video"
 
-    def _open_capture(index=0):
-        # Try a sequence of backends on Windows to avoid MSMF issues.
-        backends = []
-        if os.name == 'nt':
-            # Try MSMF first (default), then DirectShow as fallback
-            backends = [cv2.CAP_MSMF, cv2.CAP_DSHOW]
-        else:
-            backends = [0]
+    frame_file = Path(__file__).resolve().parents[1] / "tmp" / f"last_frame_{camera_id}.jpg"
 
-        for b in backends:
-            try:
-                cap = cv2.VideoCapture(index, b) if isinstance(b, int) else cv2.VideoCapture(index)
-            except Exception:
-                cap = cv2.VideoCapture(index)
+    def _open_capture(src):
+        # Default to checking common indices if no source is specified
+        sources_to_try = [src] if src != "" else [0, 1, 2]
+        
+        for current_src in sources_to_try:
+            if isinstance(current_src, str) and current_src.isdigit():
+                current_src = int(current_src)
 
+            # Try a sequence of backends on Windows to avoid MSMF issues.
+            backends = []
+            if os.name == 'nt' and isinstance(current_src, int):
+                # Try DirectShow first, then MSMF as fallback
+                backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF]
+            elif isinstance(current_src, int):
+                backends = [0]
+            else:
+                backends = [0] # Dummy backend for string URLs
+
+            for b in backends:
+                try:
+                    cap = cv2.VideoCapture(current_src, b) if isinstance(b, int) and b != 0 else cv2.VideoCapture(current_src)
+                except Exception:
+                    cap = cv2.VideoCapture(current_src)
+
+                if cap is not None and cap.isOpened():
+                    # Ensure we can actually read a frame
+                    ok, _ = cap.read()
+                    if ok:
+                        return cap
+                    else:
+                        cap.release()
+
+            # Last resort: default capture without explicit backend
+            cap = cv2.VideoCapture(current_src)
             if cap is not None and cap.isOpened():
-                return cap
-
-        # Last resort: default capture without explicit backend
-        cap = cv2.VideoCapture(index)
-        if cap is not None and cap.isOpened():
-            return cap
+                ok, _ = cap.read()
+                if ok:
+                    return cap
+                else:
+                    cap.release()
 
         return None
 
-    cap = _open_capture(0)
+    cap = _open_capture(source)
 
     def _placeholder_frame():
         h, w = 480, 640
@@ -149,7 +180,6 @@ def generate_frames():
                         time.sleep(0.1)
                         continue
                 except Exception:
-                    # fallback to capture below
                     pass
 
             # If no pushed frame, fall back to local capture
@@ -177,7 +207,8 @@ def generate_frames():
                 time.sleep(0.25)
                 continue
 
-            frame = _draw_predictions(frame)
+            # Skip YOLO detection for now as requested (raw stream only)
+            # frame = _draw_predictions(frame)
 
             # Overlay info kamera
             cv2.putText(
@@ -211,9 +242,9 @@ def generate_frames():
 
 
 @router.post('/api/push-frame')
-async def push_frame(frame: UploadFile = File(...)):
-    """Detector posts a JPEG frame here. Backend saves it to tmp/last_frame.jpg and video_feed serves it."""
-    frame_file = Path(__file__).resolve().parents[1] / "tmp" / "last_frame.jpg"
+async def push_frame(camera_id: str = "1", frame: UploadFile = File(...)):
+    """Detector posts a JPEG frame here. Backend saves it to tmp/last_frame_{camera_id}.jpg and video_feed serves it."""
+    frame_file = Path(__file__).resolve().parents[1] / "tmp" / f"last_frame_{camera_id}.jpg"
     try:
         frame_file.parent.mkdir(parents=True, exist_ok=True)
         contents = await frame.read()
@@ -224,9 +255,9 @@ async def push_frame(frame: UploadFile = File(...)):
         return {"ok": False, "error": str(e)}
 
 
-@router.get("/api/video-feed/1")
-def video_feed_1():
+@router.get("/api/video-feed/{camera_id}")
+def video_feed_api(camera_id: str):
     return StreamingResponse(
-        generate_frames(),
+        generate_frames(camera_id),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )

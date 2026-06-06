@@ -10,6 +10,9 @@ function AdminSystemConfig() {
     cooldown_seconds: 120,
   });
   
+  const [cameraMap, setCameraMap] = useState({ "1": "", "2": "", "3": "" });
+  const [devices, setDevices] = useState([]);
+
   const [telegramToken, setTelegramToken] = useState("");
   const [imgbbApiKey, setImgbbApiKey] = useState("");
   
@@ -27,6 +30,7 @@ function AdminSystemConfig() {
           setConfig(data);
           setTelegramToken(data.telegram_token || "");
           setImgbbApiKey(data.imgbb_api_key || "");
+          setCameraMap(data.camera_map || { "1": "", "2": "", "3": "" });
         }
       } catch (err) {
         console.error("Gagal memuat konfigurasi:", err);
@@ -34,7 +38,21 @@ function AdminSystemConfig() {
         setLoading(false);
       }
     }
+    
+    async function getDevices() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = allDevices.filter(d => d.kind === 'videoinput');
+        setDevices(videoDevices);
+        stream.getTracks().forEach(t => t.stop());
+      } catch (err) {
+        console.warn("Media devices not accessible:", err);
+      }
+    }
+    
     loadConfig();
+    getDevices();
   }, []);
 
   const handleTestTelegram = async () => {
@@ -75,6 +93,7 @@ function AdminSystemConfig() {
       cooldown_seconds: parseInt(config.cooldown_seconds),
       telegram_token: telegramToken,
       imgbb_api_key: imgbbApiKey,
+      camera_map: cameraMap,
     };
 
     // Validasi input threshold
@@ -230,15 +249,83 @@ function AdminSystemConfig() {
         )}
       </div>
 
-      {/* DETECTION SETTINGS */}
+      {/* CAMERA SETTINGS */}
       <h2 className="section-title" style={{ marginTop: "40px", marginBottom: "20px" }}>
-        Detection Settings
+        Camera Settings
       </h2>
+      <p style={{ fontSize: "14px", color: "#666", marginBottom: "20px" }}>
+        Pilih kamera lokal atau IP Camera untuk masing-masing area pemantauan.
+      </p>
 
       {loading ? (
         <p style={{ color: "#003F98" }}>Memuat konfigurasi...</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          
+          {[
+            { id: "1", name: 'Area 1 - Packing' },
+            { id: "2", name: 'Area 2 - Warehouse' },
+            { id: "3", name: 'Area 3 - Production' }
+          ].map(area => {
+            const currentVal = cameraMap[area.id] || "";
+            const isLocal = ['0', '1', '2'].includes(currentVal) || devices.some(d => d.deviceId === currentVal);
+            
+            return (
+              <div key={area.id} style={{ marginBottom: "15px" }}>
+                <p className="section" style={{ color: "#003F98", fontSize: "16px", marginBottom: "5px" }}>
+                  {area.name}
+                </p>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  <select
+                    value={isLocal ? currentVal : ""}
+                    onChange={(e) => setCameraMap(prev => ({ ...prev, [area.id]: e.target.value }))}
+                    style={{
+                      width: "250px",
+                      padding: "10px",
+                      borderRadius: "10px",
+                      border: "1px solid #003F98",
+                      background: "#E6ECF5",
+                      color: "#003F98",
+                      fontWeight: "bold"
+                    }}
+                  >
+                    <option value="">-- Pilih Kamera Lokal --</option>
+                    {devices.map((d, idx) => (
+                      d.deviceId ? (
+                        <option key={d.deviceId} value={idx.toString()}>
+                          {d.label || `Camera ${idx}`}
+                        </option>
+                      ) : null
+                    ))}
+                  </select>
+                  
+                  <span style={{ fontWeight: "bold", color: "#666", fontSize: "14px" }}>ATAU</span>
+                  
+                  <input 
+                    type="text"
+                    placeholder="http://192.168.x.x:4747/video"
+                    value={!isLocal ? currentVal : ""}
+                    onChange={(e) => setCameraMap(prev => ({ ...prev, [area.id]: e.target.value }))}
+                    style={{
+                      width: "350px",
+                      padding: "10px",
+                      borderRadius: "10px",
+                      border: "1px solid #003F98",
+                      background: "#E6ECF5",
+                      color: "#003F98",
+                      fontWeight: "bold"
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+      {/* DETECTION SETTINGS */}
+      <h2 className="section-title" style={{ marginTop: "40px", marginBottom: "20px" }}>
+        Detection Settings
+      </h2>
+
           <div style={{ color: "#003F98" }}>
             <p className="section">Confidence Threshold</p>
             <p style={{ fontSize: "14px", color: "#666", marginBottom: "5px" }}>

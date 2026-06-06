@@ -61,16 +61,16 @@ const LiveCamsContent = ({ area = 'All' }) => {
   }, []);
 
   const toggleCamera = async (cameraId) => {
-    // If enabling, make this the only enabled camera. If disabling, disable all.
     setIsTransitioning(true);
     const willEnable = !activeCameras[cameraId];
-    const next = {};
-    cameraFeeds.forEach((f) => {
-      next[f.id] = willEnable ? f.id === cameraId : false;
-    });
-    setActiveCameras(next);
+    
+    // Allow multiple cameras to be active at the same time
+    setActiveCameras(prev => ({
+      ...prev,
+      [cameraId]: willEnable
+    }));
 
-    // send to backend
+    // send to backend (keeps the last interacted camera as 'active' for legacy script)
     const cam = cameraFeeds.find((c) => c.id === cameraId);
     try {
       await fetch(BACKEND_ACTIVE_URL, {
@@ -120,7 +120,7 @@ const LiveCamsContent = ({ area = 'All' }) => {
       {activeCameras[cam.id] ? (
         <img
           key={cam.id}
-          src={VIDEO_FEED_URL}
+          src={`${BACKEND_BASE_URL}/api/video-feed/${cam.id}`}
           alt={`Live feed ${cam.name}`}
           className="absolute inset-0 h-full w-full object-cover"
         />

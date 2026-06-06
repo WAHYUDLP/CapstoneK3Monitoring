@@ -47,6 +47,8 @@ PUSH_FRAME_URL = "http://127.0.0.1:9001/api/push-frame"
 _last_push_frame = 0
 PUSH_FRAME_INTERVAL = 0.5  # seconds
 
+current_camera_source = None
+
 
 def _init_active_camera_from_backend():
     global SITE_LOCATION
@@ -203,35 +205,65 @@ def bbox_center(box):
     x1, y1, x2, y2 = box
     return (x1 + x2) / 2.0, (y1 + y2) / 2.0
 
-def buka_kamera(index_opsi=(0, 1, 2)):
-    for idx in index_opsi:
-        # On Windows, DirectShow is often more stable than MSMF for webcam selection.
-        if os.name == "nt":
-            cap_uji = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+def buka_kamera(src):
+    # Fix URL for DroidCam if it's the root URL
+    if isinstance(src, str):
+        src = src.strip()
+        if src.startswith("http"):
+            if src.endswith(":4747") or src.endswith(":4747/"):
+                src = src.rstrip("/") + "/video"
+        
+        # If it's a digit string, convert to int
+        if src.isdigit():
+            src = int(src)
+            
+    # Default to scanning 0, 1, 2 if empty
+    sources_to_try = [src] if src != "" else [0, 1, 2]
+    
+    for s in sources_to_try:
+        backends = []
+        if os.name == 'nt' and isinstance(s, int):
+            backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF]
+        elif isinstance(s, int):
+            backends = [0]
         else:
-            cap_uji = cv2.VideoCapture(idx)
-        if not cap_uji.isOpened():
+            backends = [0] # Dummy backend
+
+        for b in backends:
+            try:
+                cap_uji = cv2.VideoCapture(s, b) if isinstance(b, int) and b != 0 else cv2.VideoCapture(s)
+            except Exception:
+                cap_uji = cv2.VideoCapture(s)
+
+            if cap_uji is not None and cap_uji.isOpened():
+                ok, frame_uji = cap_uji.read()
+                if ok and frame_uji is not None:
+                    print(f"INFO: Kamera berhasil dibuka: {s}")
+                    return cap_uji, s
+                cap_uji.release()
+                
+        # Last resort
+        cap_uji = cv2.VideoCapture(s)
+        if cap_uji is not None and cap_uji.isOpened():
+            ok, frame_uji = cap_uji.read()
+            if ok and frame_uji is not None:
+                print(f"INFO: Kamera berhasil dibuka (fallback): {s}")
+                return cap_uji, s
             cap_uji.release()
-            continue
-        ok, frame_uji = cap_uji.read()
-        if ok and frame_uji is not None:
-            print(f"Kamera aktif di index: {idx}")
-            return cap_uji
-        cap_uji.release()
-    return None
 
-cap = buka_kamera()
+    return None, src
+
+cap, current_camera_source = buka_kamera("")
 if cap is None:
-    print("ERROR: Kamera tidak terdeteksi.")
-    raise SystemExit(1)
+    print("WARNING: Kamera tidak terdeteksi saat startup. Akan terus mencoba...")
 
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-if CAMERA_HEIGHT is not None:
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-
-actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-print(f"INFO: resolusi kamera aktif = {actual_w}x{actual_h}")
+if cap is not None:
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+    if CAMERA_HEIGHT is not None:
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+    actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print(f"INFO: resolusi kamera aktif = {actual_w}x{actual_h}")
 
 cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_AUTOSIZE)
 if FULLSCREEN_VIEW:
@@ -245,7 +277,14 @@ monitoring_enabled = True
 print("Kontrol runtime: 'p' pause/resume, 's' split view, 'q' quit")
 print("=== SISTEM MONITORING K3 AKTIF ===")
 
-while cap.isOpened():
+while True:
+    # Map SITE_LOCATION to camera_id (1, 2, 3)
+    cam_id_str = "1"
+    if "2" in SITE_LOCATION or "Warehouse" in SITE_LOCATION:
+        cam_id_str = "2"
+    elif "3" in SITE_LOCATION or "Production" in SITE_LOCATION:
+        cam_id_str = "3"
+
     # refresh SITE_LOCATION and threshold configs from backend if available
     try:
         now_ts = time.time()
@@ -282,33 +321,37 @@ while cap.isOpened():
                         MISSING_FRAMES_THRESHOLD = min_frames * 2
                         
                         PERSON_ALERT_COOLDOWN_SEC = int(data.get("cooldown_seconds", PERSON_ALERT_COOLDOWN_SEC))
+
+                        # Check if camera source changed!
+                        camera_map = data.get("camera_map", {})
+                        desired_source = camera_map.get(cam_id_str, "").strip()
+                        
+                        # Compare to handle changes
+                        if str(desired_source) != str(current_camera_source) and (desired_source != "" or current_camera_source not in [0,1,2]):
+                            print(f"INFO: Mengubah sumber kamera dari {current_camera_source} ke {desired_source}")
+                            if cap is not None:
+                                cap.release()
+                            cap, current_camera_source = buka_kamera(desired_source)
             except Exception:
                 pass
     except Exception:
         pass
+        
+    if cap is None or not cap.isOpened():
+        # Retry logic if camera is totally disconnected
+        time.sleep(1.0)
+        cap, current_camera_source = buka_kamera(current_camera_source if current_camera_source is not None else "")
+        if cap is None:
+            continue
+        
     success, frame = cap.read()
     if not success:
-        print("ERROR: Gagal membaca frame dari kamera.")
-        break
+        print("ERROR: Gagal membaca frame dari kamera. Akan mencoba reconnect...")
+        cap.release()
+        cap = None
+        continue
 
-    # Periodically push a JPEG of the current frame to backend so LiveCams can display it
-    try:
-        now_push = time.time()
-        if now_push - _last_push_frame >= PUSH_FRAME_INTERVAL:
-            _last_push_frame = now_push
-            try:
-                ok, buf = cv2.imencode('.jpg', frame)
-                if ok:
-                    files = {'frame': ('frame.jpg', buf.tobytes(), 'image/jpeg')}
-                    # fire-and-forget but keep it short
-                    try:
-                        requests.post(PUSH_FRAME_URL, files=files, timeout=0.8)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-    except Exception:
-        pass
+    # Move the push frame logic AFTER display_img is generated below.
 
     if 0 < INFERENCE_DOWNSCALE < 1.0:
         inf_w = max(1, int(frame.shape[1] * INFERENCE_DOWNSCALE))
@@ -516,6 +559,33 @@ while cap.isOpened():
         up_h = int(display_img.shape[0] * DISPLAY_UPSCALE)
         display_img = cv2.resize(display_img, (up_w, up_h), interpolation=cv2.INTER_CUBIC)
 
+    # Periodically push a JPEG of the YOLO-processed frame to backend so LiveCams can display it
+    try:
+        now_push = time.time()
+        if now_push - _last_push_frame >= PUSH_FRAME_INTERVAL:
+            _last_push_frame = now_push
+            try:
+                ok, buf = cv2.imencode('.jpg', display_img)
+                if ok:
+                    # Map SITE_LOCATION to camera_id (1, 2, 3)
+                    cam_id = "1"
+                    if "2" in SITE_LOCATION or "Warehouse" in SITE_LOCATION:
+                        cam_id = "2"
+                    elif "3" in SITE_LOCATION or "Production" in SITE_LOCATION:
+                        cam_id = "3"
+                        
+                    push_url = f"{PUSH_FRAME_URL}?camera_id={cam_id}"
+                    files = {'frame': ('frame.jpg', buf.tobytes(), 'image/jpeg')}
+                    # fire-and-forget but keep it short
+                    try:
+                        requests.post(push_url, files=files, timeout=0.8)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     if split_view:
         panel_w = 380
         h = display_img.shape[0]
@@ -558,5 +628,6 @@ while cap.isOpened():
             split_view = not split_view
             print("Split view ON" if split_view else "Split view OFF")
 
-cap.release()
+if cap is not None:
+    cap.release()
 cv2.destroyAllWindows()

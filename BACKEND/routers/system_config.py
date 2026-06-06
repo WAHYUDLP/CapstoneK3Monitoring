@@ -16,6 +16,7 @@ class SystemConfig(BaseModel):
     cooldown_seconds: int
     telegram_token: str | None = None
     imgbb_api_key: str | None = None
+    camera_map: dict | None = None
 
 class TelegramTestPayload(BaseModel):
     token: str
@@ -29,7 +30,12 @@ DEFAULT_CONFIG = {
     "min_detection_frames": 5,
     "cooldown_seconds": 120,
     "telegram_token": "8541407692:AAFBxusrjfoDsU8fHxsb_tlKc6DfYGAs3C4",
-    "imgbb_api_key": "158ee9e068a89b28e5b374a664a8e192"
+    "imgbb_api_key": "158ee9e068a89b28e5b374a664a8e192",
+    "camera_map": {
+        "1": "",
+        "2": "",
+        "3": ""
+    }
 }
 
 def load_config():
