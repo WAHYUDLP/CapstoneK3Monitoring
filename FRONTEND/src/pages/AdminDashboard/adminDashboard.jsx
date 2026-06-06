@@ -3,13 +3,18 @@ import "../../App.css";
 
 function AdminDashboard() {
   // 1. STATE BUAT NAMPUNG DATA CPU & RAM DARI BACKEND
-  const [systemData, setSystemData] = useState({ cpu: 0, memory: 0, storage: 0 });
+  const [systemData, setSystemData] = useState({ 
+    cpu: 0, 
+    memory: 0, 
+    storage: 0, 
+    api_status: { telegram: "failed", imgbb: "failed" }
+  });
 
   // 2. SHORT POLLING: Narik data dari server tiap 3 detik
   useEffect(() => {
     const fetchSystemUsage = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/system-usage");
+        const response = await fetch("http://localhost:9001/api/system-usage");
         const result = await response.json();
         
         if (result.status === "success") {
@@ -17,7 +22,8 @@ function AdminDashboard() {
           setSystemData({
             cpu: Math.round(result.data.cpu_percent),
             memory: Math.round(result.data.memory_percent),
-            storage: Math.round(result.data.storage_percent)
+            storage: Math.round(result.data.storage_percent),
+            api_status: result.data.api_status || { telegram: "failed", imgbb: "failed" }
           });
         }
       } catch (error) {
@@ -34,6 +40,7 @@ function AdminDashboard() {
   return (
     <div
       className="container"
+      
       style={{
         marginLeft: "303px",
         width: "calc(100% - 303px)",
@@ -43,32 +50,35 @@ function AdminDashboard() {
         boxSizing: "border-box",
       }}
     >
-      <div className="content-wrapper">
+      <div className="content-wrapper" >
         {/* TOP CARDS */}
         <div className="top-cards">
-          <div className="card">
+
+          {/* untuk active device sama shutdown time jadi dipakai kah? */}
+          {/* <div className="card">
             <h3 style={{ marginBottom: "40px" }}>System Downtime</h3>
             <h1>0h23m</h1>
             <p>
               <span style={{ color: "green" }}>+5%</span> vs last week
             </p>
-          </div>
+          </div> */}
 
           <div className="card">
-            <h3 style={{ marginBottom: "40px" }}>Active Device</h3>
-            <h1>
-              32<span style={{ color: "#1e3a8a" }}>/64</span>
+            <h3 className="section-title" style={{ marginBottom: "40px" }}>Active Device</h3>
+            <h1 className="section-title">
+              1<span style={{ color: "#1e3a8a" }} >/3</span>
             </h1>
             <p className="green">Online</p>
           </div>
 
+
           <div className="card">
-            <h3 style={{ marginBottom: "40px" }}>API Status</h3>
-            <p style={{ fontSize: 20, color: "#2B60AA" }}>
-              <span className="dot green-bg"></span> Telegram
+            <h3 className="section-title" style={{ marginBottom: "40px" }}>API Status</h3>
+            <p  style={{ fontSize: 20, color: "#2B60AA" }}>
+              <span className={`dot ${systemData.api_status.telegram === "success" ? "green-bg" : "red-bg"}`}></span> Telegram
             </p>
-            <p style={{ fontSize: 20, color: "#2B60AA" }}>
-              <span className="dot red-bg"></span> ImgBB
+            <p  style={{ fontSize: 20, color: "#2B60AA" }}>
+              <span className={`dot ${systemData.api_status.imgbb === "success" ? "green-bg" : "red-bg"}`}></span> ImgBB
             </p>
           </div>
         </div>
@@ -77,7 +87,7 @@ function AdminDashboard() {
         <div className="bottom-section">
           {/* SYSTEM USAGE */}
           <div className="card large" style={{ color: "#1E3A8A", flex: 1.5 }}>
-            <h3 style={{ marginBottom: "40px" }}>System Usage</h3>
+            <h3 className="section-title" style={{ marginBottom: "40px" }}>System Usage</h3>
             <div className="usage">
               
               {/* LINGKARAN MEMORY (Udah Live dari Backend) */}
@@ -113,11 +123,12 @@ function AdminDashboard() {
             </div>
           </div>
 
+          {/* untuk api request succest rate jadi dipakai kah? */}
           {/* API CHART (fake bar) */}
-          <div className="card large">
+          {/* <div className="card large">
             <h3 style={{ marginBottom: "20px" }}>API Request Success Rate</h3>
             <div className="chart-container">
-              {/* CHART */}
+
               <div className="chart">
                 <div className="bar-group">
                   <div className="bar-stack">
@@ -136,7 +147,6 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              {/* SIDE INFO */}
               <div className="side-info">
                 <div className="mini-card">
                   <p>
@@ -161,7 +171,9 @@ function AdminDashboard() {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
+
+
         </div>
       </div>
     </div>

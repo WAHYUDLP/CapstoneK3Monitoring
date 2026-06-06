@@ -10,7 +10,24 @@ from ultralytics import YOLO
 from collections import defaultdict
 
 # --- KONFIGURASI API ---
-IMGBB_API_KEY = "158ee9e068a89b28e5b374a664a8e192" 
+import sys
+
+# Cari path ke folder BACKEND dan import config.py
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if os.path.basename(script_dir) == "MODEL":
+    backend_dir = os.path.join(os.path.dirname(script_dir), "BACKEND")
+elif os.path.basename(script_dir) == "BACKEND":
+    backend_dir = script_dir
+else:
+    backend_dir = os.path.join(script_dir, "BACKEND")
+
+sys.path.append(backend_dir)
+
+try:
+    import config
+    IMGBB_API_KEY = getattr(config, "IMGBB_API_KEY", "158ee9e068a89b28e5b374a664a8e192").strip()
+except ImportError:
+    IMGBB_API_KEY = "158ee9e068a89b28e5b374a664a8e192" 
 
 # Info lokasi kejadian
 SITE_LOCATION = os.environ.get("SITE_LOCATION_OVERRIDE", "Area 1 - Packing")
@@ -23,6 +40,9 @@ URL_BACKEND = "http://127.0.0.1:9001/report-violation"
 ACTIVE_CAMERA_URL = "http://127.0.0.1:9001/active-camera"
 _last_active_check = 0
 ACTIVE_CHECK_INTERVAL = 5.0  # seconds
+SYSTEM_CONFIG_URL = "http://127.0.0.1:9001/api/system-config"
+_last_config_check = 0
+CONFIG_CHECK_INTERVAL = 5.0  # seconds
 PUSH_FRAME_URL = "http://127.0.0.1:9001/api/push-frame"
 _last_push_frame = 0
 PUSH_FRAME_INTERVAL = 0.5  # seconds
@@ -45,7 +65,10 @@ def _init_active_camera_from_backend():
         print(f"INFO: Could not fetch active camera at startup: {e}; using default SITE_LOCATION.")
 
 # --- INISIALISASI MODEL ---
-model = YOLO('best.pt')
+# Load model relatif terhadap direktori script agar bisa dijalankan dari mana saja
+script_dir = os.path.dirname(os.path.abspath(__file__))
+model_path = os.path.join(script_dir, "best.pt")
+model = YOLO(model_path)
 # Fallback ID 
 APD_CLASS_MAP = {0: "helmet", 1: "mask", 7: "vest"}
 PERSON_CLASS_ID = 5
@@ -223,7 +246,7 @@ print("Kontrol runtime: 'p' pause/resume, 's' split view, 'q' quit")
 print("=== SISTEM MONITORING K3 AKTIF ===")
 
 while cap.isOpened():
-    # refresh SITE_LOCATION from backend active camera if available
+    # refresh SITE_LOCATION and threshold configs from backend if available
     try:
         now_ts = time.time()
         if now_ts - _last_active_check >= ACTIVE_CHECK_INTERVAL:
@@ -234,6 +257,31 @@ while cap.isOpened():
                     j = resp.json()
                     if j and j.get("name"):
                         SITE_LOCATION = j.get("name")
+            except Exception:
+                pass
+
+        if now_ts - _last_config_check >= CONFIG_CHECK_INTERVAL:
+            _last_config_check = now_ts
+            try:
+                resp_cfg = requests.get(SYSTEM_CONFIG_URL, timeout=1.0)
+                if resp_cfg.status_code == 200:
+                    cfg_json = resp_cfg.json()
+                    if cfg_json.get("status") == "success" and "data" in cfg_json:
+                        data = cfg_json["data"]
+                        # Dynamically update in-memory configurations
+                        CONF_THRESHOLD = float(data.get("confidence_threshold", CONF_THRESHOLD))
+                        PERSON_CONF_THRESHOLD = CONF_THRESHOLD
+                        APD_CONF_THRESHOLD["mask"] = CONF_THRESHOLD
+                        APD_CONF_THRESHOLD["helmet"] = min(0.95, CONF_THRESHOLD * 2.0)
+                        APD_CONF_THRESHOLD["vest"] = min(0.95, CONF_THRESHOLD * 2.0)
+                        
+                        APD_PERSON_IOU_THRESHOLD = float(data.get("iou_threshold", APD_PERSON_IOU_THRESHOLD))
+                        
+                        min_frames = int(data.get("min_detection_frames", NEVER_WEAR_FRAMES))
+                        NEVER_WEAR_FRAMES = min_frames
+                        MISSING_FRAMES_THRESHOLD = min_frames * 2
+                        
+                        PERSON_ALERT_COOLDOWN_SEC = int(data.get("cooldown_seconds", PERSON_ALERT_COOLDOWN_SEC))
             except Exception:
                 pass
     except Exception:
