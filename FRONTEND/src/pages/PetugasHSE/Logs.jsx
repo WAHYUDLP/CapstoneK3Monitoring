@@ -1,25 +1,114 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { fetchViolationsFiltered } from '../../api';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 
-// Mock data for reference layout
-const logsData = [
-  { id: 1, area: 'Area 1', date: '23/3/2026', time: '07:34:44', violation: 'PPE01', evidence: '202603230734441.jpg' },
-  { id: 2, area: 'Area 2', date: '23/3/2026', time: '07:36:21', violation: 'PPE02', evidence: '202603230736212.jpg' },
-  { id: 3, area: 'Area 2', date: '23/3/2026', time: '07:37:46', violation: 'PPE03', evidence: '202603230737462.jpg' },
-  { id: 4, area: 'Area 3', date: '23/3/2026', time: '09:56:14', violation: 'PPE02', evidence: '202603230956143.jpg' },
-  { id: 5, area: 'Area 2', date: '24/3/2026', time: '14:21:55', violation: 'PPE02', evidence: '202603241421552.jpg' },
-  { id: 6, area: 'Area 1', date: '23/3/2026', time: '07:34:44', violation: 'PPE01', evidence: '202603230734441.jpg' },
-  { id: 7, area: 'Area 2', date: '23/3/2026', time: '07:36:21', violation: 'PPE02', evidence: '202603230736212.jpg' },
-  { id: 8, area: 'Area 2', date: '23/3/2026', time: '07:37:46', violation: 'PPE03', evidence: '202603230737462.jpg' },
-  { id: 9, area: 'Area 3', date: '23/3/2026', time: '09:56:14', violation: 'PPE02', evidence: '202603230956143.jpg' },
-  { id: 10, area: 'Area 2', date: '24/3/2026', time: '14:21:55', violation: 'PPE02', evidence: '202603241421552.jpg' },
+// initial placeholder until API results arrive
+const initialMock = [
+  { id: 0, area: 'Area 1', date: '23/3/2026', time: '07:34:44', violation: 'PPE01', evidence: '202603230734441.jpg' },
 ];
 
 const pageSizeOptions = [10, 15, 20, 25];
 
-const LogsContent = () => {
+const LogsContent = ({ filterStartDate = '', filterEndDate = '', filterArea = 'All' }) => {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [logsData, setLogsData] = useState(initialMock);  const [isLoading, setIsLoading] = useState(false);
+  // Local mapping from APD part to code and Indonesian label
+  const PPE_CODE_MAP = {
+    helmet: 'PPE-01',
+    vest: 'PPE-02',
+    mask: 'PPE-03',
+  };
+
+  const LABEL_MAP_INDO = {
+    helmet: 'Tidak Memakai Helm',
+    vest: 'Tidak Memakai Rompi (Vest)',
+    mask: 'Tidak Memakai Masker',
+    any_apd: 'Tidak Memakai APD Lengkap',
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setIsLoading(true);
+      setCurrentPage(1);
+      const rows = await fetchViolationsFiltered({
+        startDate: filterStartDate,
+        endDate: filterEndDate,
+        area: filterArea,
+      });
+      if (!mounted) return;
+      setIsLoading(false);
+      if (!rows || rows.length === 0) {
+        setLogsData([]);
+        return;
+      }
+
+      // sort newest first by created_at
+      rows.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+      const normalize = (s = '') => String(s).trim().toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
+
+      const mapped = rows.map((r) => {
+        const dt = r.created_at ? new Date(r.created_at) : new Date();
+        const date = dt.toLocaleDateString('id-ID');
+        const time = dt.toLocaleTimeString('id-ID');
+        const rawLabel = r.label || r.violation_type || r.violation_label || 'UNKNOWN';
+        const evidenceUrl = r.image_path || '';
+
+        const labelNorm = normalize(rawLabel);
+
+        let violationCode = r.violation_code || '-';
+        let violationLabel = r.violation_label || '-';
+
+        // handle combined labels like 'not_wearing_helmet_and_vest' or 'not wearing helmet and vest'
+        if (labelNorm.includes('_and_') || labelNorm.includes('_dan_') || labelNorm.includes(' and ')) {
+          // split by _and_
+          const core = labelNorm.startsWith('not_wearing_') ? labelNorm.replace(/^not_wearing_/, '') : labelNorm;
+          const parts = core.split('_and_').join('_and_').split('_and_');
+          const codes = [];
+          const labels = [];
+          parts.forEach((p) => {
+            const part = p.replace(/^not_wearing_/, '').replace(/^_/, '').replace(/_and_/, '');
+            const key = part;
+            codes.push(PPE_CODE_MAP[key] || '-');
+            labels.push(LABEL_MAP_INDO[key] || part.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+          });
+          violationCode = codes.join(', ');
+          violationLabel = labels.join(' dan ');
+        } else {
+          // single label
+          const stripped = labelNorm.startsWith('not_wearing_') ? labelNorm.replace(/^not_wearing_/, '') : labelNorm;
+          if (PPE_CODE_MAP[stripped]) {
+            violationCode = PPE_CODE_MAP[stripped];
+            violationLabel = LABEL_MAP_INDO[stripped] || violationLabel;
+          } else {
+            // fallback to whatever backend provided
+            violationCode = r.violation_code || violationCode;
+            violationLabel = r.violation_label || violationLabel;
+          }
+        }
+
+        const safeTime = dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
+        const evidenceName = r.image_path ? `${violationCode}_${date}_${safeTime}` : '-';
+
+        return {
+          id: r.id,
+          area: r.site_location || r.camera_id || 'Unknown',
+          date,
+          time,
+          violationCode,
+          violationLabel,
+          evidenceName,
+          evidenceUrl,
+        };
+      });
+      setLogsData(mapped);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [filterStartDate, filterEndDate, filterArea]);
 
   const totalRows = logsData.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -28,7 +117,7 @@ const LogsContent = () => {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
     return logsData.slice(start, end);
-  }, [currentPage, pageSize]);
+  }, [currentPage, pageSize, logsData]);
 
   const startRow = totalRows === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRow = Math.min(currentPage * pageSize, totalRows);
@@ -45,7 +134,15 @@ const LogsContent = () => {
     <div className="h-full min-h-0 flex flex-col font-sans overflow-hidden">
       
       {/* Card wrapper */}
-      <div className="bg-white rounded-xl shadow-sm border border-[#c8d6ea] flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-[#c8d6ea] flex flex-col flex-1 min-h-0 overflow-hidden relative">
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/40 rounded-xl flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-8 w-8 animate-spin rounded-full border-3 border-[#003f98] border-t-transparent" />
+              <p className="text-sm font-medium text-[#003f98]">Filtering logs...</p>
+            </div>
+          </div>
+        )}
         
         {/* Card Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#e6ecf5]">
@@ -76,40 +173,47 @@ const LogsContent = () => {
         </div>
 
         {/* Table Area */}
-        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto">
+        <div className={`flex-1 min-h-0 overflow-x-auto overflow-y-auto transition-opacity duration-300 ${isLoading ? 'opacity-50' : 'opacity-100'}`}>
           <table className="w-full text-left border-collapse min-w-[800px]">
             {/* Table header */}
-            <thead className="bg-[#f4f7fb]">
+            <thead className="bg-[#f4f7fb] sticky top-0 z-10">
               <tr>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[5%]">No.</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Area</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Date</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Time</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[20%]">Violation</th>
-                <th className="px-6 py-4 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[30%]">Evidence</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[5%]">No.</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Area</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Date</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[15%]">Time</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[20%]">Violation</th>
+                <th className="px-6 py-2.5 text-[12px] font-bold text-[#6b90c3] uppercase tracking-wider w-[30%]">Evidence</th>
               </tr>
             </thead>
             
             {/* Table rows */}
             <tbody className="divide-y divide-[#e6ecf5]">
-              {paginatedRows.map((log) => (
-                <tr key={log.id} className="hover:bg-[#f0f4f9] transition-colors duration-200">
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#00265d]">{log.id}</td>
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#00265d]">{log.area}</td>
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#6b90c3]">{log.date}</td>
-                  <td className="px-6 py-4 text-[14px] font-medium text-[#6b90c3]">{log.time}</td>
-                  <td className="px-6 py-4">
+              {paginatedRows.map((log, idx) => (
+                <tr key={log.id || idx} className="hover:bg-[#f0f4f9] transition-colors duration-200">
+                  <td className="px-6 py-1.5 text-[14px] font-medium text-[#00265d]">{(currentPage - 1) * pageSize + idx + 1}</td>
+                  <td className="px-6 py-1.5 text-[14px] font-medium text-[#00265d]">{log.area}</td>
+                  <td className="px-6 py-1.5 text-[14px] font-medium text-[#6b90c3]">{log.date}</td>
+                  <td className="px-6 py-1.5 text-[14px] font-medium text-[#6b90c3]">{log.time}</td>
+                  <td className="px-6 py-1.5">
                     {/* Violation badge */}
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[13px] font-semibold bg-[#e6ecf5] text-[#003f98] border border-[#c8d6ea]">
-                      {log.violation}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="inline-flex w-fit items-center px-2 py-0.5 rounded text-[12px] font-semibold bg-[#e6ecf5] text-[#003f98] border border-[#c8d6ea]">
+                        {log.violationCode}
+                      </span>
+                      <span className="mt-0.5 text-[11px] text-[#6b90c3]">
+                        {log.violationLabel}
+                      </span>
+                    </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <a 
-                      href={`#${log.evidence}`} 
+                  <td className="px-6 py-1.5">
+                    <a
+                      href={log.evidenceUrl || '#'}
+                      target={log.evidenceUrl ? '_blank' : undefined}
+                      rel={log.evidenceUrl ? 'noreferrer' : undefined}
                       className="text-[14px] font-semibold text-[#003f98] hover:text-[#002c6a] hover:underline underline-offset-4 transition-all flex items-center gap-1"
                     >
-                      {log.evidence}
+                      {log.evidenceName || '-'}
                     </a>
                   </td>
                 </tr>

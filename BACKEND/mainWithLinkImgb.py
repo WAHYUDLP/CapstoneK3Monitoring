@@ -10,23 +10,6 @@ from ultralytics import YOLO
 from collections import defaultdict
 
 # --- KONFIGURASI API ---
-# Daftar gratis di api.imgbb.com untuk dapat kuncinya.
-def _read_env_file_value(key_name, env_path=".env"):
-    if not os.path.exists(env_path):
-        return ""
-    try:
-        with open(env_path, "r", encoding="utf-8") as f:
-            for raw_line in f:
-                line = raw_line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                k, v = line.split("=", 1)
-                if k.strip() == key_name:
-                    return v.strip().strip('"').strip("'")
-    except Exception:
-        return ""
-    return ""
-
 import sys
 
 # Cari path ke folder BACKEND dan import config.py
@@ -42,40 +25,51 @@ sys.path.append(backend_dir)
 
 try:
     import config
-    IMGBB_API_KEY = getattr(config, "IMGBB_API_KEY", "").strip()
+    IMGBB_API_KEY = getattr(config, "IMGBB_API_KEY", "158ee9e068a89b28e5b374a664a8e192").strip()
 except ImportError:
-    IMGBB_API_KEY = ""
+    IMGBB_API_KEY = "158ee9e068a89b28e5b374a664a8e192" 
 
-if not IMGBB_API_KEY:
-    IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "").strip() or _read_env_file_value("IMGBB_API_KEY")
-
-if not IMGBB_API_KEY:
-    print("ERROR: IMGBB_API_KEY belum diset di config.py, .env, atau environment variable.")
-    raise SystemExit(1)
-
-# Info lokasi kejadian (isi sesuai lokasi proyek)
-SITE_LOCATION = "Area Proyek A"
+# Info lokasi kejadian
+SITE_LOCATION = os.environ.get("SITE_LOCATION_OVERRIDE", "Area 1 - Packing")
 SITE_LAT = ""
 SITE_LON = ""
 TIMEZONE_NAME = "Asia/Jakarta"
 
-# URL Backend Temanmu
-# PERHATIAN: Kalau beda laptop, ganti "localhost" dengan IP WiFi temanmu! (misal: 192.168.1.10)
-URL_BACKEND = "http://localhost:9001/report-violation"
-SYSTEM_CONFIG_URL = "http://localhost:9001/api/system-config"
-ACTIVE_CAMERA_URL = "http://localhost:9001/active-camera"
-PUSH_FRAME_URL = "http://localhost:9001/api/push-frame"
+# URL Backend
+URL_BACKEND = "http://127.0.0.1:9001/report-violation"
+ACTIVE_CAMERA_URL = "http://127.0.0.1:9001/active-camera"
+_last_active_check = 0
+ACTIVE_CHECK_INTERVAL = 5.0  # seconds
+SYSTEM_CONFIG_URL = "http://127.0.0.1:9001/api/system-config"
 _last_config_check = 0
 CONFIG_CHECK_INTERVAL = 5.0  # seconds
-_last_frame_push = 0
-FRAME_PUSH_INTERVAL = 0.2  # push 5 frames per second
+PUSH_FRAME_URL = "http://127.0.0.1:9001/api/push-frame"
+_last_push_frame = 0
+PUSH_FRAME_INTERVAL = 0.5  # seconds
+
+
+def _init_active_camera_from_backend():
+    global SITE_LOCATION
+    try:
+        resp = requests.get(ACTIVE_CAMERA_URL, timeout=1.0)
+        if resp.status_code == 200:
+            j = resp.json()
+            if j and j.get("name"):
+                SITE_LOCATION = j.get("name")
+                print(f"INFO: Initialized SITE_LOCATION from backend: {SITE_LOCATION}")
+            else:
+                print("INFO: No active camera set in backend; using default SITE_LOCATION.")
+        else:
+            print(f"INFO: Active-camera endpoint returned {resp.status_code}; using default SITE_LOCATION.")
+    except Exception as e:
+        print(f"INFO: Could not fetch active camera at startup: {e}; using default SITE_LOCATION.")
 
 # --- INISIALISASI MODEL ---
 # Load model relatif terhadap direktori script agar bisa dijalankan dari mana saja
 script_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(script_dir, "best.pt")
 model = YOLO(model_path)
-# Fallback ID (kalau auto-resolve gagal)
+# Fallback ID 
 APD_CLASS_MAP = {0: "helmet", 1: "mask", 7: "vest"}
 PERSON_CLASS_ID = 5
 
@@ -172,11 +166,14 @@ DISPLAY_UPSCALE = 2.0
 MISSING_FRAMES_THRESHOLD = 10
 NEVER_WEAR_FRAMES = 5
 TELEGRAM_RENOTIFY_INTERVAL_SEC = 300
+# Cooldown global per track ID agar alert beda jenis tidak mepet.
+PERSON_ALERT_COOLDOWN_SEC = 120
 ALERT_SPATIAL_DISTANCE_PX = 100
 MIN_SEEN_FRAMES_FOR_REMOVE_ALERT = 3
 
 tracked_states = {}
 last_violation_notification = {}
+last_person_notification = {}
 recent_alert_locations = defaultdict(list)
 recent_violations = []
 
@@ -249,8 +246,20 @@ print("Kontrol runtime: 'p' pause/resume, 's' split view, 'q' quit")
 print("=== SISTEM MONITORING K3 AKTIF ===")
 
 while cap.isOpened():
+    # refresh SITE_LOCATION and threshold configs from backend if available
     try:
         now_ts = time.time()
+        if now_ts - _last_active_check >= ACTIVE_CHECK_INTERVAL:
+            _last_active_check = now_ts
+            try:
+                resp = requests.get(ACTIVE_CAMERA_URL, timeout=1.0)
+                if resp.status_code == 200:
+                    j = resp.json()
+                    if j and j.get("name"):
+                        SITE_LOCATION = j.get("name")
+            except Exception:
+                pass
+
         if now_ts - _last_config_check >= CONFIG_CHECK_INTERVAL:
             _last_config_check = now_ts
             try:
@@ -259,6 +268,7 @@ while cap.isOpened():
                     cfg_json = resp_cfg.json()
                     if cfg_json.get("status") == "success" and "data" in cfg_json:
                         data = cfg_json["data"]
+                        # Dynamically update in-memory configurations
                         CONF_THRESHOLD = float(data.get("confidence_threshold", CONF_THRESHOLD))
                         PERSON_CONF_THRESHOLD = CONF_THRESHOLD
                         APD_CONF_THRESHOLD["mask"] = CONF_THRESHOLD
@@ -271,38 +281,34 @@ while cap.isOpened():
                         NEVER_WEAR_FRAMES = min_frames
                         MISSING_FRAMES_THRESHOLD = min_frames * 2
                         
-                        TELEGRAM_RENOTIFY_INTERVAL_SEC = int(data.get("cooldown_seconds", TELEGRAM_RENOTIFY_INTERVAL_SEC))
-            except Exception:
-                pass
-            
-            try:
-                resp_cam = requests.get(ACTIVE_CAMERA_URL, timeout=1.0)
-                if resp_cam.status_code == 200:
-                    cam_data = resp_cam.json()
-                    if cam_data.get("name"):
-                        new_loc = cam_data["name"]
-                        if SITE_LOCATION != new_loc and monitoring_enabled:
-                            print(f"🔄 Switched camera: {SITE_LOCATION} -> {new_loc}")
-                            # Clear tracked states when switching to avoid carrying over history
-                            tracked_states.clear()
-                            pelanggar_tercatat.clear()
-                        SITE_LOCATION = new_loc
-                        if not monitoring_enabled:
-                            monitoring_enabled = True
-                            print(f"▶️ Auto-resumed: Camera enabled ({SITE_LOCATION})")
-                    else:
-                        if monitoring_enabled:
-                            monitoring_enabled = False
-                            print("⏸️ Auto-paused: No active camera")
+                        PERSON_ALERT_COOLDOWN_SEC = int(data.get("cooldown_seconds", PERSON_ALERT_COOLDOWN_SEC))
             except Exception:
                 pass
     except Exception:
         pass
-
     success, frame = cap.read()
     if not success:
         print("ERROR: Gagal membaca frame dari kamera.")
         break
+
+    # Periodically push a JPEG of the current frame to backend so LiveCams can display it
+    try:
+        now_push = time.time()
+        if now_push - _last_push_frame >= PUSH_FRAME_INTERVAL:
+            _last_push_frame = now_push
+            try:
+                ok, buf = cv2.imencode('.jpg', frame)
+                if ok:
+                    files = {'frame': ('frame.jpg', buf.tobytes(), 'image/jpeg')}
+                    # fire-and-forget but keep it short
+                    try:
+                        requests.post(PUSH_FRAME_URL, files=files, timeout=0.8)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+    except Exception:
+        pass
 
     if 0 < INFERENCE_DOWNSCALE < 1.0:
         inf_w = max(1, int(frame.shape[1] * INFERENCE_DOWNSCALE))
@@ -313,18 +319,8 @@ while cap.isOpened():
 
     if not monitoring_enabled:
         frame_paused = frame.copy()
-        cv2.putText(frame_paused, "PAUSED - Camera disabled", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        cv2.putText(frame_paused, "PAUSED - tekan 'p' untuk resume", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
         cv2.imshow(WINDOW_NAME, frame_paused)
-        
-        if now_ts - _last_frame_push >= FRAME_PUSH_INTERVAL:
-            _last_frame_push = now_ts
-            try:
-                ok, buffer = cv2.imencode(".jpg", frame_paused)
-                if ok:
-                    requests.post(PUSH_FRAME_URL, files={"frame": ("frame.jpg", buffer.tobytes(), "image/jpeg")}, timeout=0.2)
-            except Exception:
-                pass
-
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
@@ -381,6 +377,11 @@ while cap.isOpened():
         key_violation = (tid, vtype)
         now_ts = time.time()
         last_sent_ts = last_violation_notification.get(key_violation)
+        last_person_ts = last_person_notification.get(tid)
+
+        # Cek Anti Spam Per-Orang (berlaku lintas jenis pelanggaran)
+        if last_person_ts is not None and (now_ts - last_person_ts) < PERSON_ALERT_COOLDOWN_SEC:
+            return
         
         # Cek Anti Spam Waktu
         if last_sent_ts is not None and (now_ts - last_sent_ts) < TELEGRAM_RENOTIFY_INTERVAL_SEC:
@@ -407,7 +408,6 @@ while cap.isOpened():
         cv2.imwrite(temp_filename, frame_img)
         
         image_url = ""
-        viewer_url = ""
         try:
             with open(temp_filename, "rb") as file:
                 payload_imgbb = {"key": IMGBB_API_KEY}
@@ -415,10 +415,7 @@ while cap.isOpened():
                 res_cloud = requests.post("https://api.imgbb.com/1/upload", params=payload_imgbb, files=files)
             
             if res_cloud.status_code == 200:
-                json_data = res_cloud.json()["data"]
-                # Ganti .co dengan .co.com untuk membypass blokir ISP di Indonesia (seperti Telkomsel/Indihome)
-                image_url = json_data["url"].replace(".co/", ".co.com/")
-                viewer_url = json_data.get("url_viewer", image_url).replace(".co/", ".co.com/")
+                image_url = res_cloud.json()["data"]["url"]
                 print(f"✅ Foto ter-upload ke ImgBB: {image_url}")
             else:
                 print("⚠️ Gagal upload ke ImgBB!")
@@ -430,11 +427,12 @@ while cap.isOpened():
 
         # 2. Lempar data (termasuk link ImgBB) ke Backend Temanmu
         if image_url: # Pastikan fotonya berhasil ke-upload dulu
+   
             payload_be = {
-                "camera_id": SITE_LOCATION,
+                # Gunakan variabel SITE_LOCATION agar dinamis sesuai filter di dashboard
+                "camera_id": SITE_LOCATION, 
                 "label": vtype,
-                "image_path": image_url, # <-- Link ini yang bakal ditangkap BE
-                "viewer_url": viewer_url,
+                "image_path": image_url, 
                 "id_pekerja": str(tid)
             }
 
@@ -451,6 +449,7 @@ while cap.isOpened():
         # 3. Update State UI AI
         pelanggar_tercatat.add(key_violation)
         last_violation_notification[key_violation] = now_ts
+        last_person_notification[tid] = now_ts
         recent_alert_locations[vtype].append((now_ts, center_x, center_y))
         recent_violations.insert(0, (now_ts, f"{event_time} | ID {tid} | {vtype}"))
         if len(recent_violations) > 20:
@@ -463,6 +462,8 @@ while cap.isOpened():
             "ever": set(),
             "seen_counts": defaultdict(int),
             "missing_counts": defaultdict(int),
+            # Once classified as not_wearing_any_apd, suppress per-item not_wearing alerts for this track.
+            "reported_not_wearing_any": False,
         })
         state["age"] += 1
         current_present = detected_apd_per_person.get(person_id, set())
@@ -483,12 +484,30 @@ while cap.isOpened():
             ):
                 report_violation(person_id, f"attempt_remove_{apd_name}", frame, current_present, person_boxes[person_id]["bbox"])
 
-        if state["age"] >= NEVER_WEAR_FRAMES and not any(apd in state["ever"] for apd in APD_CLASS_MAP.values()):
-            report_violation(person_id, "not_wearing_any_apd", frame, current_present, person_boxes[person_id]["bbox"])
-        else:
-            for apd_name in APD_CLASS_MAP.values():
-                if state["age"] >= NEVER_WEAR_FRAMES and apd_name not in state["ever"]:
-                    report_violation(person_id, f"not_wearing_{apd_name}", frame, current_present, person_boxes[person_id]["bbox"])
+        # After enough seen frames, compute missing APD set and report once per person.
+        if state["age"] >= NEVER_WEAR_FRAMES:
+            all_apds = list(APD_CLASS_MAP.values())
+            missing = [apd for apd in all_apds if apd not in state["ever"]]
+
+            # If nothing missing, skip
+            if not missing:
+                continue
+
+            # If we've already reported a combined missing alert for this person, skip
+            if state.get("reported_not_wearing_any"):
+                continue
+
+            # Build label: if missing everything use generic key, if one use not_wearing_x, else combine
+            if len(missing) == len(all_apds):
+                label_to_send = "not_wearing_any_apd"
+            elif len(missing) == 1:
+                label_to_send = f"not_wearing_{missing[0]}"
+            else:
+                # e.g. not_wearing_helmet_and_vest
+                label_to_send = "not_wearing_" + "_and_".join(missing)
+
+            report_violation(person_id, label_to_send, frame, current_present, person_boxes[person_id]["bbox"])
+            state["reported_not_wearing_any"] = True
 
     display_img = results[0].plot()
 
@@ -519,26 +538,25 @@ while cap.isOpened():
     else:
         cv2.imshow(WINDOW_NAME, display_img)
         
-    # Push frame to backend
-    if now_ts - _last_frame_push >= FRAME_PUSH_INTERVAL:
-        _last_frame_push = now_ts
-        try:
-            ok, buffer = cv2.imencode(".jpg", display_img)
-            if ok:
-                requests.post(PUSH_FRAME_URL, files={"frame": ("frame.jpg", buffer.tobytes(), "image/jpeg")}, timeout=0.2)
-        except Exception:
-            pass
-
-        
     key = cv2.waitKey(1) & 0xFF
-    if key == ord('q'):
-        break
-    if key == ord('p'):
-        monitoring_enabled = not monitoring_enabled
-        print("Monitoring paused" if not monitoring_enabled else "Monitoring resumed")
-    if key == ord('s'):
-        split_view = not split_view
-        print("Split view ON" if split_view else "Split view OFF")
+    # Robust key handling: accept upper/lower case and ignore special codes
+    if key != 255:
+        try:
+            kch = chr(key).lower()
+        except Exception:
+            kch = ""
+        # debug print when key pressed (helps diagnose missing focus)
+        if kch:
+            print(f"Key pressed: {kch} (code {key})")
+
+        if kch == 'q':
+            break
+        if kch == 'p':
+            monitoring_enabled = not monitoring_enabled
+            print("Monitoring paused" if not monitoring_enabled else "Monitoring resumed")
+        if kch == 's':
+            split_view = not split_view
+            print("Split view ON" if split_view else "Split view OFF")
 
 cap.release()
 cv2.destroyAllWindows()

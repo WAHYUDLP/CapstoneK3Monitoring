@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { Calendar, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { fetchDashboardSummary, ping } from '../../api';
+import { ChevronDown, ChevronLeft, ChevronRight, Menu, X, LayoutDashboard, Video, FileText, History, Shield, LogOut } from 'lucide-react';
 import LogsContent from './Logs';
 import LiveCamsContent from './LiveCamsContent';
 import ReportsContent from './Report';
+import ViolationTypes from './ViolationTypes';
 
-const optionsWaktu = ['Today', 'Weekly', 'Monthly'];
+const optionsWaktu = ['All', 'Today', 'Weekly', 'Monthly'];
 const optionsShift = ['All', 'Morning', 'Afternoon', 'Night'];
 const optionsArea = ['All', 'Packing', 'Warehouse', 'Production'];
 
@@ -17,6 +19,7 @@ const dataByPeriod = {
     violationDelta: '-3%',
     violationDeltaColor: 'text-[#e24b4b]',
     mostViolated: 'PPE-01',
+    mostViolatedLabel: 'Tidak Memakai Helm',
     mostViolatedPeriod: 'This day',
     compareText: 'vs yesterday',
     lineValues: [3, 11, 8, 18, 12, 15, 9, 6, 2],
@@ -31,6 +34,7 @@ const dataByPeriod = {
     violationDelta: '-6%',
     violationDeltaColor: 'text-[#e24b4b]',
     mostViolated: 'PPE-03',
+    mostViolatedLabel: 'Tidak Memakai Masker',
     mostViolatedPeriod: 'This week',
     compareText: 'vs last week',
     lineValues: [6, 10, 12, 15, 11, 9, 7],
@@ -45,6 +49,7 @@ const dataByPeriod = {
     violationDelta: '-8%',
     violationDeltaColor: 'text-[#e24b4b]',
     mostViolated: 'PPE-02',
+    mostViolatedLabel: 'Tidak Memakai Rompi (Vest)',
     mostViolatedPeriod: 'This month',
     compareText: 'vs last month',
     lineValues: [12, 14, 11, 15, 19, 16, 13, 12],
@@ -67,7 +72,15 @@ const buildLinePoints = (values, width, height, padding) => {
     .join(' ');
 };
 
-const DashboardMainContent = ({ selectedData, linePoints, maxBar}) => {
+const DashboardMainContent = ({ selectedData, linePoints }) => {
+  const barValues7 = (() => {
+    const vals = Array.isArray(selectedData.barValues) ? selectedData.barValues.slice() : [];
+    while (vals.length < 7) vals.push(0);
+    return vals.slice(0, 7);
+  })();
+
+  const maxBarLocal = Math.max(...barValues7, 25);
+
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -93,6 +106,7 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar}) => {
           <h2 className="text-[22px] font-bold text-[#003f98] mb-4">Most Violated</h2>
           <div className="text-[64px] font-bold text-[#003f98] leading-none mb-3">{selectedData.mostViolated}</div>
           <div className="text-[20px] font-medium text-[#003f98]">{selectedData.mostViolatedPeriod}</div>
+          <div className="text-[13px] font-medium text-[#6b90c3]">{selectedData.mostViolatedLabel}</div>
         </div>
       </div>
 
@@ -152,8 +166,8 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar}) => {
               </div>
 
               <div className="relative h-full flex items-end justify-around pb-8 pt-2 z-20">
-                {selectedData.barValues.map((value, index) => {
-                  const heightPercent = Math.min((value / maxBar) * 100, 100);
+                {barValues7.map((value, index) => {
+                  const heightPercent = Math.min((value / maxBarLocal) * 100, 100);
                   return (
                     <div key={index} className="flex flex-col items-center justify-end h-full w-full">
                       <div className="w-10 sm:w-14 bg-[#2b60aa] rounded-t-md transition-all duration-500 ease-in-out" style={{ height: `${heightPercent}%` }} title={`Value: ${value}`} />
@@ -163,46 +177,124 @@ const DashboardMainContent = ({ selectedData, linePoints, maxBar}) => {
               </div>
 
               <div className="absolute bottom-2 left-0 w-full flex justify-around text-[11px] text-[#6b90c3] font-medium z-20">
-                {selectedData.barValues.map((_, i) => (
-                  <span key={i}>PPE-0{i + 1}</span>
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <span key={i}>{`PPE-0${i + 1}`}</span>
                 ))}
               </div>
             </div>
           </div>
         </div>
       </div>
-
     </>
   );
 };
 
-const DashboardPetugasHSE = ({ onLogout }) => {
+const DashboardPetugasHSE = ({ onLogout, username = 'HSE Officer' }) => {
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [waktu, setWaktu] = useState('Today');
   const [shift, setShift] = useState('All');
   const [area, setArea] = useState('All');
+  const [isPageTransitioning, setIsPageTransitioning] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [logsStartDate, setLogsStartDate] = useState(todayIso);
+  const [logsEndDate, setLogsEndDate] = useState(todayIso);
+  const [logsArea, setLogsArea] = useState('All');
   const [reportDraft, setReportDraft] = useState({
-    startDate: '2026-03-27',
-    endDate: '2026-03-27',
-    shift: 'Morning (08:00 - 16:00)',
-    area: 'Area 1 - Packing',
+    startDate: todayIso,
+    endDate: todayIso,
+    shift: 'All',
+    area: 'All',
   });
   const [reportApplied, setReportApplied] = useState({
-    startDate: '2026-03-27',
-    endDate: '2026-03-27',
-    shift: 'Morning (08:00 - 16:00)',
-    area: 'Area 1 - Packing',
+    startDate: todayIso,
+    endDate: todayIso,
+    shift: 'All',
+    area: 'All',
   });
+  const [serverStatus, setServerStatus] = useState('Checking...');
+  const [dashboardData, setDashboardData] = useState(dataByPeriod);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
-  const selectedData = dataByPeriod[waktu];
+  const selectedData = dashboardData[waktu] || dataByPeriod[waktu] || dataByPeriod.Today;
 
   const linePoints = useMemo(
     () => buildLinePoints(selectedData.lineValues, 760, 240, 20),
     [selectedData.lineValues]
   );
 
-  const maxBar = Math.max(...selectedData.barValues, 25);
+  const barValues7 = (() => {
+    const vals = Array.isArray(selectedData.barValues) ? selectedData.barValues.slice() : [];
+    while (vals.length < 7) vals.push(0);
+    return vals.slice(0, 7);
+  })();
+
+  const maxBar = Math.max(...barValues7, 25);
   const showTimeAndShiftFilters = activeMenu !== 'Live Cams';
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSidebarOpen(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await ping();
+        if (!mounted) return;
+        setServerStatus(res.status_server || 'Unknown');
+      } catch {
+        if (!mounted) return;
+        setServerStatus('Offline ❌');
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const controller = new AbortController();
+    const load = async () => {
+      setIsDashboardLoading(true);
+      try {
+        const period = waktu === 'All' ? 'All' : waktu;
+        const data = await fetchDashboardSummary({ period, shift, area, signal: controller.signal });
+        if (!mounted || !data) return;
+        setDashboardData((prev) => ({ ...prev, [waktu]: data }));
+      } finally {
+        if (mounted) setIsDashboardLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; controller.abort(); };
+  }, [waktu, shift, area]);
+
+  const handleMenuSelect = (menu) => {
+    if (activeMenu === menu) return;
+    setIsPageTransitioning(true);
+    if (window.innerWidth < 1024) {
+      setIsSidebarOpen(false);
+    }
+    setTimeout(() => {
+      setActiveMenu(menu);
+    }, 150);
+    setTimeout(() => {
+      setIsPageTransitioning(false);
+    }, 300);
+  };
+
+  const handleLogout = () => {
+    setIsLoggingOut(true);
+    setTimeout(() => {
+      onLogout();
+    }, 500);
+  };
 
   const handleGenerateReport = () => {
     setReportApplied({ ...reportDraft });
@@ -210,11 +302,11 @@ const DashboardPetugasHSE = ({ onLogout }) => {
 
   const renderMainContent = () => {
     if (activeMenu === 'Logs') {
-      return <LogsContent />;
+      return <LogsContent filterStartDate={logsStartDate} filterEndDate={logsEndDate} filterArea={logsArea} />;
     }
 
     if (activeMenu === 'Live Cams') {
-      return <LiveCamsContent />;
+      return <LiveCamsContent area={area} />;
     }
 
     if (activeMenu === 'Reports') {
@@ -226,6 +318,10 @@ const DashboardPetugasHSE = ({ onLogout }) => {
           filterArea={reportApplied.area}
         />
       );
+    }
+
+    if (activeMenu === 'PPE Types') {
+      return <ViolationTypes />;
     }
 
     return (
@@ -241,47 +337,89 @@ const DashboardPetugasHSE = ({ onLogout }) => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f0f3f8] font-sans text-[#00265d]">
-      <aside className="sticky top-0 z-10 flex h-screen w-70 shrink-0 flex-col bg-[#003f98] px-6 py-8 text-white shadow-xl">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-14 h-14 rounded-full bg-gray-300 overflow-hidden border-2 border-white/20">
-            <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="Profile" className="w-full h-full object-cover" />
-          </div>
-          <div>
-            <p className="text-[10px] text-white/70 mb-1">Friday, 27 March 2026</p>
-            <p className="text-xs text-white/90">Hello,</p>
-            <p className="text-lg font-bold tracking-wide">Pham Hanni</p>
-          </div>
-        </div>
+    <div className="flex h-screen w-full overflow-hidden bg-[#f0f3f8] font-sans text-[#00265d]">
+      
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 left-0 w-full h-16 bg-[#003f98] text-white flex items-center justify-between px-4 z-40 shadow-md">
+        <div className="text-[18px] font-bold">HSE Monitoring</div>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 cursor-pointer rounded-md hover:bg-white/10 transition-colors">
+          {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </div>
 
-        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto scroll-smooth pr-1">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/50 z-20 backdrop-blur-sm transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed lg:relative top-0 left-0 z-30 flex h-screen shrink-0 flex-col bg-[#003f98] py-6 pt-20 lg:pt-6 text-white shadow-xl transition-all duration-300 ease-in-out ${
+          isSidebarOpen 
+            ? 'w-[280px] px-6 translate-x-0' 
+            : 'w-[280px] lg:w-[80px] px-6 lg:px-4 -translate-x-full lg:translate-x-0'
+        }`}>
+          {/* Desktop Toggle Button */}
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            title="Toggle Sidebar"
+            className="hidden lg:flex absolute -right-3 top-10 items-center justify-center w-6 h-6 bg-white text-[#003f98] border border-[#003f98] rounded-full cursor-pointer hover:bg-gray-200 transition-colors z-40 shadow-md"
+          >
+            {isSidebarOpen ? <ChevronLeft size={16} strokeWidth={3} /> : <ChevronRight size={16} strokeWidth={3} />}
+          </button>
+
+          <div className={`flex items-center gap-4 mb-8 transition-all duration-300 ${!isSidebarOpen ? 'lg:justify-center' : ''}`}>
+            <div className="w-14 h-14 rounded-full bg-gray-300 overflow-hidden border-2 border-white/20 shrink-0">
+              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="Profile" className="w-full h-full object-cover" />
+            </div>
+            <div className={`whitespace-nowrap transition-all duration-300 overflow-hidden ${!isSidebarOpen ? 'lg:opacity-0 lg:w-0' : 'opacity-100 w-auto'}`}>
+              <p className="text-[10px] text-white/70 mb-1">Friday, 27 March 2026</p>
+              <p className="text-[10px] text-white/70 mb-1">Backend: {serverStatus}</p>
+              <p className="text-xs text-white/90">Hello,</p>
+              <p className="text-lg font-bold tracking-wide">{username}</p>
+            </div>
+          </div>
+
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto scroll-smooth pr-2 flex flex-col items-center lg:items-stretch">
           <div className="mb-6 h-px w-full bg-white/20" />
 
-          <nav className="mb-8 flex flex-col gap-5 text-base">
-            {['Dashboard', 'Live Cams', 'Reports', 'Logs'].map((menu) => {
-              const isActive = activeMenu === menu;
+          <nav className="mb-8 flex flex-col gap-2 text-base w-full">
+            {[
+              { name: 'Dashboard', icon: LayoutDashboard },
+              { name: 'Live Cams', icon: Video },
+              { name: 'Reports', icon: FileText },
+              { name: 'Logs', icon: History },
+              { name: 'PPE Types', icon: Shield }
+            ].map(({ name, icon: Icon }) => {
+              const isActive = activeMenu === name;
               return (
                 <button
-                  key={menu}
+                  key={name}
                   type="button"
-                  onClick={() => setActiveMenu(menu)}
-                  className={`cursor-pointer text-left ${
-                    isActive ? 'font-bold text-white' : 'text-white/80 hover:text-white'
-                  }`}
+                  onClick={() => handleMenuSelect(name)}
+                  title={!isSidebarOpen ? name : undefined}
+                  className={`cursor-pointer flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full ${
+                    isActive ? 'bg-white/20 font-bold text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  } ${!isSidebarOpen ? 'lg:justify-center' : ''}`}
                 >
-                  {menu}
+                  <Icon size={20} className="shrink-0" />
+                  <span className={`whitespace-nowrap transition-all duration-300 ${!isSidebarOpen ? 'lg:opacity-0 lg:w-0 overflow-hidden' : 'opacity-100'}`}>
+                    {name}
+                  </span>
                 </button>
               );
             })}
           </nav>
 
-          {activeMenu === 'Reports' ? (
+          <div className={`w-full transition-all duration-300 shrink-0 overflow-hidden ${!isSidebarOpen ? 'lg:opacity-0 lg:h-0' : 'opacity-100 h-auto'}`}>
+            {activeMenu === 'Reports' ? (
             <div className="mb-6 border-y border-white/20 py-4">
               <div className="flex flex-col gap-4">
                 <div>
                   <label className="mb-1 block text-sm text-white/90">Start Date</label>
                   <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
-                    <Calendar className="h-4 w-4 shrink-0 text-white" />
                     <input
                       type="date"
                       value={reportDraft.startDate}
@@ -294,7 +432,6 @@ const DashboardPetugasHSE = ({ onLogout }) => {
                 <div>
                   <label className="mb-1 block text-sm text-white/90">End Date</label>
                   <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
-                    <Calendar className="h-4 w-4 shrink-0 text-white" />
                     <input
                       type="date"
                       value={reportDraft.endDate}
@@ -312,6 +449,7 @@ const DashboardPetugasHSE = ({ onLogout }) => {
                       onChange={(event) => setReportDraft((prev) => ({ ...prev, shift: event.target.value }))}
                       className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
                     >
+                      <option value="All" className="text-black">All</option>
                       <option value="Morning (08:00 - 16:00)" className="text-black">Morning (08:00 - 16:00)</option>
                       <option value="Afternoon (16:00 - 00:00)" className="text-black">Afternoon (16:00 - 00:00)</option>
                       <option value="Night (00:00 - 08:00)" className="text-black">Night (00:00 - 08:00)</option>
@@ -328,6 +466,7 @@ const DashboardPetugasHSE = ({ onLogout }) => {
                       onChange={(event) => setReportDraft((prev) => ({ ...prev, area: event.target.value }))}
                       className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
                     >
+                      <option value="All" className="text-black">All</option>
                       <option value="Area 1 - Packing" className="text-black">Area 1 - Packing</option>
                       <option value="Area 2 - Warehouse" className="text-black">Area 2 - Warehouse</option>
                       <option value="Area 3 - Production" className="text-black">Area 3 - Production</option>
@@ -343,6 +482,51 @@ const DashboardPetugasHSE = ({ onLogout }) => {
                 >
                   Generate Report
                 </button>
+              </div>
+            </div>
+          ) : activeMenu === 'PPE Types' ? null : activeMenu === 'Logs' ? (
+            <div className="mb-6 border-y border-white/20 py-4">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">Start Date</label>
+                  <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
+                    <input
+                      type="date"
+                      value={logsStartDate}
+                      onChange={(event) => setLogsStartDate(event.target.value)}
+                      className="scheme-dark w-full bg-transparent text-sm text-white outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">End Date</label>
+                  <div className="flex h-10 items-center gap-2 rounded-md border border-white/30 bg-transparent px-3">
+                    <input
+                      type="date"
+                      value={logsEndDate}
+                      onChange={(event) => setLogsEndDate(event.target.value)}
+                      className="scheme-dark w-full bg-transparent text-sm text-white outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm text-white/90">Area</label>
+                  <div className="relative">
+                    <select
+                      value={logsArea}
+                      onChange={(event) => setLogsArea(event.target.value)}
+                      className="h-10 w-full appearance-none rounded-md border border-white/30 bg-transparent px-3 text-white focus:border-white focus:outline-none cursor-pointer"
+                    >
+                      <option value="All" className="text-black">All</option>
+                      <option value="Area 1 - Packing" className="text-black">Area 1 - Packing</option>
+                      <option value="Area 2 - Warehouse" className="text-black">Area 2 - Warehouse</option>
+                      <option value="Area 3 - Production" className="text-black">Area 3 - Production</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-5 w-5 text-white" />
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -401,20 +585,34 @@ const DashboardPetugasHSE = ({ onLogout }) => {
                 </div>
               </div>
             </div>
-          )}
+            )}
+          </div>
         </div>
 
         <button
-          onClick={onLogout}
-          className="mt-8 w-25 rounded-md border border-white/50 px-4 py-2 text-center text-sm text-white transition-colors hover:bg-white/10"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          title={!isSidebarOpen ? 'Log Out' : undefined}
+          className={`mt-4 mb-2 mx-auto flex items-center justify-center gap-3 w-full rounded-md border border-white/50 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed ${isLoggingOut ? 'opacity-50' : 'opacity-100'} ${!isSidebarOpen ? 'lg:px-0 lg:w-12' : ''}`}
         >
-          Log Out
+          <LogOut size={20} className="shrink-0" />
+          <span className={`whitespace-nowrap transition-all duration-300 overflow-hidden ${!isSidebarOpen ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}`}>
+            {isLoggingOut ? 'Logging out...' : 'Log Out'}
+          </span>
         </button>
       </aside>
 
-      <main className={`flex-1 p-10 ${activeMenu === 'Logs' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-        {renderMainContent()}
-      </main>
+        {/* Main Content */}
+        <main className={`flex-1 flex flex-col min-h-0 w-full overflow-hidden transition-all duration-300 pt-16 lg:pt-0 ${isPageTransitioning || isLoggingOut ? 'opacity-50' : 'opacity-100'}`}>
+          <div className={`flex-1 w-full ${activeMenu === 'Logs' ? 'flex flex-col overflow-hidden min-h-0' : 'overflow-y-auto'} p-4 md:p-6 lg:p-8`}>
+            {isDashboardLoading && activeMenu === 'Dashboard' ? (
+              <div className="mb-4 text-sm font-medium text-[#6b90c3]">Loading dashboard data...</div>
+            ) : null}
+            <div className={`transition-opacity duration-300 h-full ${activeMenu === 'Logs' ? 'flex flex-col min-h-0' : ''} ${isPageTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+              {renderMainContent()}
+            </div>
+          </div>
+        </main>
     </div>
   );
 };
