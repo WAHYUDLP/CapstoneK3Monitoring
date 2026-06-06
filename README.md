@@ -52,9 +52,18 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 .\MODEL\.venv\Scripts\python.exe .\MODEL\mainWithLinkImgb.py
 ```
 
+### 4) Setup Database MySQL
+Agar data log pelanggaran dan laporan bisa tersimpan dan tampil di dashboard:
+1. Pastikan MySQL Server sudah terinstall dan berjalan (menggunakan XAMPP, Laragon, atau instalasi native MySQL).
+2. Buat database baru bernama `k3_project`:
+   ```sql
+   CREATE DATABASE k3_project;
+   ```
+3. Tabel akan dibuat secara otomatis oleh backend ketika pertama kali dijalankan (via SQLAlchemy).
+
 ## Konfigurasi
 - Backend URL untuk frontend diatur lewat `VITE_API_BASE` (lihat FRONTEND/README.md).
-- Konfigurasi database ada di BACKEND/config.py.
+- Konfigurasi database ada di `BACKEND/config.py` atau via environment variable. Pastikan kredensial (username, password, host, port) sesuai dengan server MySQL lokal Anda.
 
 ## Catatan
 - Pastikan MySQL berjalan dan database `k3_project` tersedia.
