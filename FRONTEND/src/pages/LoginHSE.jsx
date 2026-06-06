@@ -113,7 +113,7 @@ const LoginHSE = ({ onLoginSuccess }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-4 flex w-full justify-center rounded-lg bg-[#003f98] px-4 py-3 text-sm font-extrabold text-white shadow-md transition-all duration-200 hover:bg-[#002c6a] focus:outline-none focus:ring-2 focus:ring-[#003f98] focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="mt-4 flex w-full justify-center rounded-lg bg-[#003f98] px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-[#002c6a] focus:outline-none focus:ring-2 focus:ring-[#003f98] focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <div className="flex items-center gap-2">

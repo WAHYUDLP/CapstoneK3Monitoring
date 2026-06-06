@@ -12,6 +12,8 @@ try:
 except ImportError:
     from db import SessionLocal
 
+START_TIME = time.time()
+
 router = APIRouter()
 
 # Cache for API status to prevent spamming Telegram and ImgBB APIs on short polling
@@ -99,12 +101,31 @@ async def get_system_usage():
     # Check API status with cache
     _check_api_status()
 
+    # 4. UPTIME & DEVICES
+    uptime_seconds = int(time.time() - START_TIME)
+    
+    # Active camera check
+    active_devices = 0
+    total_devices = 3
+    try:
+        active_cam_file = os.path.join(os.path.dirname(__file__), '..', 'active_camera.json')
+        if os.path.exists(active_cam_file):
+            with open(active_cam_file, 'r', encoding='utf-8') as f:
+                cam_data = json.load(f)
+                if cam_data.get("cameraId") is not None:
+                    active_devices = 1
+    except Exception:
+        pass
+
     return {
         "status": "success",
         "data": {
             "cpu_percent": cpu_usage,
             "memory_percent": ram_usage,
             "storage_percent": disk_usage,
+            "uptime_seconds": uptime_seconds,
+            "active_devices": active_devices,
+            "total_devices": total_devices,
             "api_status": {
                 "telegram": _api_status_cache["telegram"],
                 "imgbb": _api_status_cache["imgbb"]

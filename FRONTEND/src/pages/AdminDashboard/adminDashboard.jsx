@@ -2,15 +2,16 @@ import { useState, useEffect } from "react";
 import "../../App.css";
 
 function AdminDashboard() {
-  // 1. STATE BUAT NAMPUNG DATA CPU & RAM DARI BACKEND
   const [systemData, setSystemData] = useState({ 
     cpu: 0, 
     memory: 0, 
     storage: 0, 
+    uptime_seconds: 0,
+    active_devices: 0,
+    total_devices: 3,
     api_status: { telegram: "failed", imgbb: "failed" }
   });
 
-  // 2. SHORT POLLING: Narik data dari server tiap 3 detik
   useEffect(() => {
     const fetchSystemUsage = async () => {
       try {
@@ -18,11 +19,13 @@ function AdminDashboard() {
         const result = await response.json();
         
         if (result.status === "success") {
-          // Math.round() dipake biar angkanya dibuletin, bukan desimal. Biar tampilannya lebih bersih di dashboard.
           setSystemData({
             cpu: Math.round(result.data.cpu_percent),
             memory: Math.round(result.data.memory_percent),
             storage: Math.round(result.data.storage_percent),
+            uptime_seconds: result.data.uptime_seconds || 0,
+            active_devices: result.data.active_devices || 0,
+            total_devices: result.data.total_devices || 3,
             api_status: result.data.api_status || { telegram: "failed", imgbb: "failed" }
           });
         }
@@ -31,148 +34,116 @@ function AdminDashboard() {
       }
     };
 
-    fetchSystemUsage(); // Panggilan pertama
-    const timer = setInterval(fetchSystemUsage, 3000); // Diulang tiap 3 detik
+    fetchSystemUsage();
+    const timer = setInterval(fetchSystemUsage, 3000);
 
-    return () => clearInterval(timer); // Bersihin timer kalau pindah halaman
+    return () => clearInterval(timer);
   }, []);
 
+  const formatUptime = (seconds) => {
+    if (!seconds) return { h: 0, m: 0 };
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return { h, m };
+  };
+
+  const uptime = formatUptime(systemData.uptime_seconds);
+
   return (
-    <div
-      className="container"
-      
-      style={{
-        marginLeft: "303px",
-        width: "calc(100% - 303px)",
-        padding: "40px",
-        background: "#E6ECF5",
-        minHeight: "100vh",
-        boxSizing: "border-box",
-      }}
-    >
-      <div className="content-wrapper" >
-        {/* TOP CARDS */}
-        <div className="top-cards">
+    <div className="flex flex-col gap-8 w-full">
+      {/* TOP CARDS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
 
-          {/* untuk active device sama shutdown time jadi dipakai kah? */}
-          {/* <div className="card">
-            <h3 style={{ marginBottom: "40px" }}>System Downtime</h3>
-            <h1>0h23m</h1>
-            <p>
-              <span style={{ color: "green" }}>+5%</span> vs last week
+        <div className="bg-[#f0f4f9] rounded-xl border border-[#003f98] p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-[22px] font-bold text-[#003f98] mb-2">Active Device</h2>
+            <p className="text-[13px] text-[#6b90c3] font-medium mb-6">
+              Shows the number of currently active camera nodes capturing and sending frames for AI detection.
             </p>
-          </div> */}
-
-          <div className="card">
-            <h3 className="section-title" style={{ marginBottom: "40px" }}>Active Device</h3>
-            <h1 className="section-title">
-              1<span style={{ color: "#1e3a8a" }} >/3</span>
-            </h1>
-            <p className="green">Online</p>
           </div>
-
-
-          <div className="card">
-            <h3 className="section-title" style={{ marginBottom: "40px" }}>API Status</h3>
-            <p  style={{ fontSize: 20, color: "#2B60AA" }}>
-              <span className={`dot ${systemData.api_status.telegram === "success" ? "green-bg" : "red-bg"}`}></span> Telegram
-            </p>
-            <p  style={{ fontSize: 20, color: "#2B60AA" }}>
-              <span className={`dot ${systemData.api_status.imgbb === "success" ? "green-bg" : "red-bg"}`}></span> ImgBB
-            </p>
+          <div className="text-[64px] font-bold text-[#003f98] leading-none mb-3">
+            {systemData.active_devices}<span className="text-[#6b90c3] text-4xl">/{systemData.total_devices}</span>
+          </div>
+          <div className={`text-[20px] font-medium ${systemData.active_devices > 0 ? 'text-[#65d738]' : 'text-[#e24b4b]'}`}>
+            {systemData.active_devices > 0 ? "Online" : "Offline"}
           </div>
         </div>
 
-        {/* BOTTOM */}
-        <div className="bottom-section">
-          {/* SYSTEM USAGE */}
-          <div className="card large" style={{ color: "#1E3A8A", flex: 1.5 }}>
-            <h3 className="section-title" style={{ marginBottom: "40px" }}>System Usage</h3>
-            <div className="usage">
-              
-              {/* LINGKARAN MEMORY (Udah Live dari Backend) */}
-              <div className="circle">
-                <div className="inner" style={{ "--percent": systemData.memory }}>
-                  <div className="inner-hole">
-                    <span className="value">{systemData.memory}%</span>
-                    <span className="label">Memory</span>
-                  </div>
-                </div>
-              </div>
+        <div className="bg-[#f0f4f9] rounded-xl border border-[#003f98] p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-[22px] font-bold text-[#003f98] mb-2">API Status</h2>
+            <p className="text-[13px] text-[#6b90c3] font-medium mb-6">
+              Monitors the connection health of the Telegram Bot for alert notifications and the ImgBB database for image hosting.
+            </p>
+          </div>
+          <div className="flex flex-col gap-4 mb-3">
+            <div className="flex items-center gap-3 text-[20px] font-bold text-[#003f98]">
+              <span className={`w-4 h-4 rounded-full ${systemData.api_status.telegram === "success" ? "bg-[#65d738]" : "bg-[#e24b4b]"}`}></span> Telegram
+            </div>
+            <div className="flex items-center gap-3 text-[20px] font-bold text-[#003f98]">
+              <span className={`w-4 h-4 rounded-full ${systemData.api_status.imgbb === "success" ? "bg-[#65d738]" : "bg-[#e24b4b]"}`}></span> ImgBB
+            </div>
+          </div>
+          <div className="text-[14px] font-medium text-[#6b90c3]">Live services connection</div>
+        </div>
 
-              {/* LINGKARAN CPU (Udah Live dari Backend) */}
-              <div className="circle">
-                <div className="inner" style={{ "--percent": systemData.cpu }}>
-                  <div className="inner-hole">
-                    <span className="value">{systemData.cpu}%</span>
-                    <span className="label">CPU</span>
-                  </div>
-                </div>
-              </div>
+        {/* System Uptime Card */}
+        <div className="bg-[#f0f4f9] rounded-xl border border-[#003f98] p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-[22px] font-bold text-[#003f98] mb-2">System Uptime</h2>
+            <p className="text-[13px] text-[#6b90c3] font-medium mb-6">
+              Tracks how long the core backend system has been continuously running without interruption.
+            </p>
+          </div>
+          <div className="text-[64px] font-bold text-[#003f98] leading-none mb-3 flex items-baseline gap-1">
+            {uptime.h}<span className="text-[#6b90c3] text-4xl mr-2">h</span>
+            {uptime.m}<span className="text-[#6b90c3] text-4xl">m</span>
+          </div>
+          <div className="text-[20px] font-medium text-[#65d738]">Stable</div>
+        </div>
 
-              {/* LINGKARAN STORAGE (Biarkan hardcode dulu karena Storage jarang berubah cepat) */}
-              <div className="circle">
-                <div className="inner" style={{ "--percent": systemData.storage }}>
-                  <div className="inner-hole">
-                    <span className="value">{systemData.storage}%</span>
-                    <span className="label">Storage</span>
-                  </div>
-                </div>
-              </div>
+      </div>
 
+      {/* BOTTOM SECTION */}
+      <div className="bg-[#f0f4f9] rounded-xl border border-[#003f98] p-8 shadow-sm w-full overflow-hidden">
+        <h2 className="text-[22px] font-bold text-[#003f98] mb-2">System Usage</h2>
+        <p className="text-[14px] text-[#6b90c3] font-medium mb-10 max-w-2xl">
+          Displays the real-time resource utilization of the backend server. High CPU or Memory usage might lead to delayed AI inferences and alert processing.
+        </p>
+        
+        {/* We keep the custom CSS classes "usage", "circle", "inner" from App.css for the ring charts, 
+            but wrap them in a responsive flex layout */}
+        <div className="usage flex flex-col sm:flex-row flex-wrap justify-around items-center gap-8 py-4">
+          
+          {/* LINGKARAN MEMORY */}
+          <div className="circle scale-90 sm:scale-100">
+            <div className="inner" style={{ "--percent": systemData.memory }}>
+              <div className="inner-hole">
+                <span className="value text-[#003f98]">{systemData.memory}%</span>
+                <span className="label text-[#6b90c3]">Memory</span>
+              </div>
             </div>
           </div>
 
-          {/* untuk api request succest rate jadi dipakai kah? */}
-          {/* API CHART (fake bar) */}
-          {/* <div className="card large">
-            <h3 style={{ marginBottom: "20px" }}>API Request Success Rate</h3>
-            <div className="chart-container">
-
-              <div className="chart">
-                <div className="bar-group">
-                  <div className="bar-stack">
-                    <div className="bar fail" style={{ height: "20%" }}></div>
-                    <div className="bar success" style={{ height: "60%" }}></div>
-                  </div>
-                  <p>Telegram</p>
-                </div>
-
-                <div className="bar-group">
-                  <div className="bar-stack">
-                    <div className="bar fail" style={{ height: "25%" }}></div>
-                    <div className="bar success" style={{ height: "85%" }}></div>
-                  </div>
-                  <p>ImgBB</p>
-                </div>
-              </div>
-
-              <div className="side-info">
-                <div className="mini-card">
-                  <p>
-                    <span className="dot green-bg"></span> Success
-                  </p>
-                  <p>
-                    <span className="dot red-bg"></span> Fail
-                  </p>
-                </div>
-
-                <div className="mini-card">
-                  <p>
-                    Total Requests <br />
-                    <b>1,356</b>
-                  </p>
-                </div>
-
-                <div className="mini-card">
-                  <p>
-                    Avg Response Time <br /> <b>420ms</b>
-                  </p>
-                </div>
+          {/* LINGKARAN CPU */}
+          <div className="circle scale-90 sm:scale-100">
+            <div className="inner" style={{ "--percent": systemData.cpu }}>
+              <div className="inner-hole">
+                <span className="value text-[#003f98]">{systemData.cpu}%</span>
+                <span className="label text-[#6b90c3]">CPU</span>
               </div>
             </div>
-          </div> */}
+          </div>
 
+          {/* LINGKARAN STORAGE */}
+          <div className="circle scale-90 sm:scale-100">
+            <div className="inner" style={{ "--percent": systemData.storage }}>
+              <div className="inner-hole">
+                <span className="value text-[#003f98]">{systemData.storage}%</span>
+                <span className="label text-[#6b90c3]">Storage</span>
+              </div>
+            </div>
+          </div>
 
         </div>
       </div>

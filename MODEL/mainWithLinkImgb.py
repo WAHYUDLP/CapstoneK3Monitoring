@@ -63,8 +63,12 @@ TIMEZONE_NAME = "Asia/Jakarta"
 # PERHATIAN: Kalau beda laptop, ganti "localhost" dengan IP WiFi temanmu! (misal: 192.168.1.10)
 URL_BACKEND = "http://localhost:9001/report-violation"
 SYSTEM_CONFIG_URL = "http://localhost:9001/api/system-config"
+ACTIVE_CAMERA_URL = "http://localhost:9001/active-camera"
+PUSH_FRAME_URL = "http://localhost:9001/api/push-frame"
 _last_config_check = 0
 CONFIG_CHECK_INTERVAL = 5.0  # seconds
+_last_frame_push = 0
+FRAME_PUSH_INTERVAL = 0.2  # push 5 frames per second
 
 # --- INISIALISASI MODEL ---
 # Load model relatif terhadap direktori script agar bisa dijalankan dari mana saja
@@ -270,6 +274,28 @@ while cap.isOpened():
                         TELEGRAM_RENOTIFY_INTERVAL_SEC = int(data.get("cooldown_seconds", TELEGRAM_RENOTIFY_INTERVAL_SEC))
             except Exception:
                 pass
+            
+            try:
+                resp_cam = requests.get(ACTIVE_CAMERA_URL, timeout=1.0)
+                if resp_cam.status_code == 200:
+                    cam_data = resp_cam.json()
+                    if cam_data.get("name"):
+                        new_loc = cam_data["name"]
+                        if SITE_LOCATION != new_loc and monitoring_enabled:
+                            print(f"🔄 Switched camera: {SITE_LOCATION} -> {new_loc}")
+                            # Clear tracked states when switching to avoid carrying over history
+                            tracked_states.clear()
+                            pelanggar_tercatat.clear()
+                        SITE_LOCATION = new_loc
+                        if not monitoring_enabled:
+                            monitoring_enabled = True
+                            print(f"▶️ Auto-resumed: Camera enabled ({SITE_LOCATION})")
+                    else:
+                        if monitoring_enabled:
+                            monitoring_enabled = False
+                            print("⏸️ Auto-paused: No active camera")
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -287,8 +313,18 @@ while cap.isOpened():
 
     if not monitoring_enabled:
         frame_paused = frame.copy()
-        cv2.putText(frame_paused, "PAUSED - tekan 'p' untuk resume", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        cv2.putText(frame_paused, "PAUSED - Camera disabled", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
         cv2.imshow(WINDOW_NAME, frame_paused)
+        
+        if now_ts - _last_frame_push >= FRAME_PUSH_INTERVAL:
+            _last_frame_push = now_ts
+            try:
+                ok, buffer = cv2.imencode(".jpg", frame_paused)
+                if ok:
+                    requests.post(PUSH_FRAME_URL, files={"frame": ("frame.jpg", buffer.tobytes(), "image/jpeg")}, timeout=0.2)
+            except Exception:
+                pass
+
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
@@ -371,6 +407,7 @@ while cap.isOpened():
         cv2.imwrite(temp_filename, frame_img)
         
         image_url = ""
+        viewer_url = ""
         try:
             with open(temp_filename, "rb") as file:
                 payload_imgbb = {"key": IMGBB_API_KEY}
@@ -378,7 +415,10 @@ while cap.isOpened():
                 res_cloud = requests.post("https://api.imgbb.com/1/upload", params=payload_imgbb, files=files)
             
             if res_cloud.status_code == 200:
-                image_url = res_cloud.json()["data"]["url"]
+                json_data = res_cloud.json()["data"]
+                # Ganti .co dengan .co.com untuk membypass blokir ISP di Indonesia (seperti Telkomsel/Indihome)
+                image_url = json_data["url"].replace(".co/", ".co.com/")
+                viewer_url = json_data.get("url_viewer", image_url).replace(".co/", ".co.com/")
                 print(f"✅ Foto ter-upload ke ImgBB: {image_url}")
             else:
                 print("⚠️ Gagal upload ke ImgBB!")
@@ -394,6 +434,7 @@ while cap.isOpened():
                 "camera_id": SITE_LOCATION,
                 "label": vtype,
                 "image_path": image_url, # <-- Link ini yang bakal ditangkap BE
+                "viewer_url": viewer_url,
                 "id_pekerja": str(tid)
             }
 
@@ -477,6 +518,17 @@ while cap.isOpened():
         cv2.imshow(WINDOW_NAME, composite)
     else:
         cv2.imshow(WINDOW_NAME, display_img)
+        
+    # Push frame to backend
+    if now_ts - _last_frame_push >= FRAME_PUSH_INTERVAL:
+        _last_frame_push = now_ts
+        try:
+            ok, buffer = cv2.imencode(".jpg", display_img)
+            if ok:
+                requests.post(PUSH_FRAME_URL, files={"frame": ("frame.jpg", buffer.tobytes(), "image/jpeg")}, timeout=0.2)
+        except Exception:
+            pass
+
         
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):

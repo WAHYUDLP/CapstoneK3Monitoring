@@ -53,10 +53,9 @@ const LogsContent = ({ filterStartDate = '', filterEndDate = '', filterArea = 'A
         const dt = r.created_at ? new Date(r.created_at) : new Date();
         const date = dt.toLocaleDateString('id-ID');
         const time = dt.toLocaleTimeString('id-ID');
-        const evidenceName = r.image_path ? r.image_path.split('/').pop() : '';
+        const rawLabel = r.label || r.violation_type || r.violation_label || 'UNKNOWN';
         const evidenceUrl = r.image_path || '';
 
-        const rawLabel = r.label || r.violation_type || r.violation_label || '';
         const labelNorm = normalize(rawLabel);
 
         let violationCode = r.violation_code || '-';
@@ -89,6 +88,9 @@ const LogsContent = ({ filterStartDate = '', filterEndDate = '', filterArea = 'A
             violationLabel = r.violation_label || violationLabel;
           }
         }
+
+        const safeTime = dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
+        const evidenceName = r.image_path ? `${violationCode}_${date}_${safeTime}` : '-';
 
         return {
           id: r.id,

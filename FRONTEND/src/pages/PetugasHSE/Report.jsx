@@ -147,7 +147,12 @@ const ReportsContent = ({
           hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Jakarta', hour12: false
         }).format(dt).replace(/:/g, '.');
 
-        const evidence = r.image_path ? r.image_path.split('/').pop() : '';
+        const codeValue = r.violation_code || '-';
+        const safeTime = new Intl.DateTimeFormat('id-ID', {
+          hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta', hour12: false
+        }).format(dt).replace(/\./g, ':');
+        
+        const evidence = r.image_path ? `${codeValue}_${dateStr}_${safeTime}` : '-';
         return {
           id: r.id,
           tanggal: dateStr,
@@ -318,7 +323,7 @@ const ReportsContent = ({
           type="button"
           onClick={handlePreviewPdf}
           disabled={isGeneratingPdf || isLoadingViolations || !hasViolations}
-          className="flex items-center gap-2 bg-white text-[#00265d] border border-[#00265d] px-4 py-2 rounded-md font-semibold hover:bg-gray-50 transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex items-center gap-2 bg-white text-[#00265d] border border-[#00265d] px-4 py-2.5 rounded-md text-sm font-semibold hover:bg-gray-50 transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
         >
           <FileSearch className="w-4 h-4" /> {isGeneratingPdf ? 'Membuat PDF...' : 'Preview PDF'}
         </button>
@@ -326,7 +331,7 @@ const ReportsContent = ({
           type="button"
           onClick={handleDownloadPdf}
           disabled={isGeneratingPdf || isLoadingViolations || !hasViolations}
-          className="flex items-center gap-2 bg-[#003f98] text-white px-4 py-2 rounded-md font-semibold hover:bg-[#002c6a] transition-colors shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex items-center gap-2 bg-[#003f98] text-white px-4 py-2.5 rounded-md text-sm font-semibold hover:bg-[#002c6a] transition-colors shadow-md disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Download className="w-4 h-4" /> {isGeneratingPdf ? 'Membuat PDF...' : 'Unduh PDF'}
         </button>
@@ -413,9 +418,9 @@ const ReportsContent = ({
         </div>
 
         {/* TABEL LOG PELANGGARAN */}
-        <div>
+        <div className="overflow-x-auto mt-6">
           <h4 className="font-bold mb-2 text-[14px]">Log Pelanggaran:</h4>
-          <table className="w-full border-collapse border border-black text-[13px] text-left">
+          <table className="w-full border-collapse border border-black text-[13px] text-left min-w-[600px]">
             <thead>
               <tr className="bg-[#f3f4f6] print:bg-[#f3f4f6]">
                 <th className="border border-black px-3 py-2 w-[15%] font-bold">Tanggal</th>

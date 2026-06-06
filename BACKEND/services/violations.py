@@ -12,11 +12,15 @@ except ImportError:
 
 
 def save_violation(db, data: ViolationData) -> None:
+    combined_path = data.image_path
+    if data.viewer_url:
+        combined_path = f"{data.image_path}|{data.viewer_url}"
+
     db_item = Violation(
         camera_id=data.camera_id,
         id_pekerja=data.id_pekerja,
         violation_type=data.label,
-        image_path=data.image_path,
+        image_path=combined_path,
     )
     db.add(db_item)
     db.commit()
@@ -77,6 +81,11 @@ def serialize_violation(row: Violation) -> dict:
     violation_code = ", ".join(codes) if codes else None
     violation_label = ", ".join(labels) if labels else (LABEL_MAP.get(vtype) or vtype.replace("_", " ").title())
 
+    img_path_raw = row.image_path or ""
+    display_image_path = img_path_raw
+    if "|" in img_path_raw:
+        display_image_path = img_path_raw.split("|")[1]
+
     return {
         "id": row.id,
         "camera_id": row.camera_id,
@@ -84,6 +93,6 @@ def serialize_violation(row: Violation) -> dict:
         "violation_type": row.violation_type,
         "violation_code": violation_code,
         "violation_label": violation_label,
-        "image_path": row.image_path,
+        "image_path": display_image_path,
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }

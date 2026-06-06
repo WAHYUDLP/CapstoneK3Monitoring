@@ -28,6 +28,12 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 & ".\MODEL\.venv\Scripts\Activate.ps1"
 .\MODEL\.venv\Scripts\python.exe -m uvicorn BACKEND.server:app --host 127.0.0.1 --port 9001
 ```
+ atau
+
+ ```powershell
+cd BACKEND
+python -m uvicorn server:app --host 127.0.0.1 --port 9001 --reload 
+```
 
 Jika dependency belum terpasang:
 

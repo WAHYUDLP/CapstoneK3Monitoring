@@ -12,13 +12,17 @@ except ImportError:
 
 def _build_caption(data: ViolationData, jenis_pelanggaran: str, kode_pelanggaran: str) -> str:
     lokasi = data.site_location or data.camera_id
+    
+    # Gunakan viewer_url jika ada, jika tidak fallback ke image_path
+    viewer_url = data.viewer_url if data.viewer_url else data.image_path
+
     return (
         "\u26a0\ufe0f PELANGGARAN K3 TERDETEKSI \u26a0\ufe0f\n\n"
         f"\u23f0 Waktu: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         f"\U0001F4CD Lokasi: {lokasi}\n"
         f"\U0001F464 Jenis: {jenis_pelanggaran}\n"
         f"\U0001F3F7\ufe0f Kode Pelanggaran: {kode_pelanggaran}\n"
-        f"\U0001F4F7 URL Foto: {data.image_path}\n"
+        f"\U0001F4F7 URL Foto: {viewer_url}\n"
     )
 
 

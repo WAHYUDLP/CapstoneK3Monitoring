@@ -228,8 +228,13 @@ def generate_report_pdf(db, payload: ReportRequest):
         code = ", ".join([c for c in codes_list if c and c != "-"]) or "-"
         label = ", ".join(labels_list) if labels_list else (vtype.replace("_", " ").title() or "-")
 
-        full_image_url = (r.image_path or "-")
-        bukti = full_image_url.split("/")[-1]
+        full_image_url_raw = (r.image_path or "-")
+        full_image_url = full_image_url_raw.split("|")[0] if "|" in full_image_url_raw else full_image_url_raw
+        viewer_url = full_image_url_raw.split("|")[1] if "|" in full_image_url_raw else full_image_url
+        
+        date_str_ui = r.created_at.strftime("%d/%m/%Y") if r.created_at else "00/00/0000"
+        time_str_ui = r.created_at.strftime("%H:%M") if r.created_at else "00:00"
+        bukti = f"{code}_{date_str_ui}_{time_str_ui}" if r.image_path else "-"
 
         # === 1. PERSIAPKAN TEKS DENGAN BATAS KARAKTER PASTI (ANTI BABLAS) ===
         # Kode & Label di kolom 44mm -> max 23 huruf
@@ -301,6 +306,12 @@ def generate_report_pdf(db, payload: ReportRequest):
             # Menggunakan estimasi matematika sederhana biar gak kena bug stringWidth OS lagi
             text_w = len(bukti_line) * 1.5 * mm 
             pdf.line(bukti_x, curr_y - 1 * mm, bukti_x + text_w, curr_y - 1 * mm)
+            
+            # Buat teks ini jadi link yang bisa diklik di PDF
+            if viewer_url and viewer_url != "-":
+                rect = (bukti_x, curr_y - 1 * mm, bukti_x + text_w, curr_y + 3 * mm)
+                pdf.linkURL(viewer_url, rect, relative=0)
+                
             curr_y -= 4 * mm
 
         # Tindakan

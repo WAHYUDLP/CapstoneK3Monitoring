@@ -9,6 +9,7 @@ class ViolationData(BaseModel):
     label: str
     image_path: str
     id_pekerja: Optional[str] = "Tidak diketahui"
+    viewer_url: Optional[str] = None
 
 
 class ReportRequest(BaseModel):
