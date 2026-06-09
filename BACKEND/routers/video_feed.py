@@ -118,7 +118,7 @@ def generate_frames():
 
         return None
 
-    cap = _open_capture(0)
+    cap = None
 
     def _placeholder_frame():
         h, w = 480, 640
@@ -153,6 +153,9 @@ def generate_frames():
                     pass
 
             # If no pushed frame, fall back to local capture
+            if cap is None and not frame_file.exists():
+                cap = _open_capture(0)
+
             if cap is None:
                 placeholder = _placeholder_frame()
                 if placeholder is None:

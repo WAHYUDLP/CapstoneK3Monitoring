@@ -16,6 +16,7 @@ const LiveCamsContent = ({ area = 'All' }) => {
     }, {}),
   );
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [streamKey, setStreamKey] = useState(Date.now());
 
   // Backend API
   const BACKEND_BASE_URL = 'http://127.0.0.1:9001';
@@ -69,6 +70,9 @@ const LiveCamsContent = ({ area = 'All' }) => {
       next[f.id] = willEnable ? f.id === cameraId : false;
     });
     setActiveCameras(next);
+    if (willEnable) {
+      setStreamKey(Date.now());
+    }
 
     // send to backend
     const cam = cameraFeeds.find((c) => c.id === cameraId);
@@ -119,8 +123,8 @@ const LiveCamsContent = ({ area = 'All' }) => {
 
       {activeCameras[cam.id] ? (
         <img
-          key={cam.id}
-          src={VIDEO_FEED_URL}
+          key={`${cam.id}-${streamKey}`}
+          src={`${VIDEO_FEED_URL}?t=${streamKey}`}
           alt={`Live feed ${cam.name}`}
           className="absolute inset-0 h-full w-full object-cover"
         />
