@@ -14,8 +14,8 @@ const ViolationTypes = () => {
   return (
     <div className="h-full min-h-0 flex flex-col font-sans">
       <div className="bg-white rounded-xl shadow-sm border border-[#c8d6ea] p-6">
-        <h2 className="text-[20px] font-bold text-[#00265d]">Jenis Pelanggaran PPE</h2>
-        <p className="text-sm text-[#6b90c3] mt-1">Referensi kode pelanggaran untuk laporan dan dashboard.</p>
+        <h2 className="text-[20px] font-bold text-[#00265d]">Types of PPE Violations</h2>
+        <p className="text-sm text-[#6b90c3] mt-1">Violation code reference for reports and dashboards.</p>
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           {PPE_TYPES.map((item) => (

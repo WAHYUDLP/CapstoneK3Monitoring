@@ -2,7 +2,7 @@
     "confidence_threshold": 0.67,
     "iou_threshold": 0.04,
     "min_detection_frames": 9,
-    "cooldown_seconds": 103,
-    "telegram_token": "8541407692:AAFBxusrjfoDsU8fHxsb_tlKc6DfYGAs3C4",
+    "cooldown_seconds": 30,
+    "telegram_token": "8707229189:AAEPf1wB8XJ3b-_HieOR23qsVBi85zBKiks",
     "imgbb_api_key": "158ee9e068a89b28e5b374a664a8e192"
 }

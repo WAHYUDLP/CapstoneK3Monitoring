@@ -133,7 +133,15 @@ const DashboardMainContent = ({ selectedData, linePoints }) => {
                 {selectedData.lineValues.map((_, index) => {
                   const points = linePoints.split(' ');
                   const [x, y] = points[index].split(',');
-                  return <circle key={index} cx={x} cy={y} r="5" fill="#f0f4f9" stroke="#003f98" strokeWidth="2.5" />;
+                  return (
+                    <g key={index} className="group cursor-pointer">
+                      <circle cx={x} cy={y} r="6" fill="#f0f4f9" stroke="#003f98" strokeWidth="2.5" className="group-hover:fill-[#003f98] transition-all duration-300" />
+                      <rect x={parseFloat(x) - 18} y={parseFloat(y) - 32} width="36" height="20" rx="4" fill="#00265d" className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                      <text x={x} y={parseFloat(y) - 18} textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                        {selectedData.lineValues[index]}
+                      </text>
+                    </g>
+                  );
                 })}
               </svg>
 
@@ -170,7 +178,11 @@ const DashboardMainContent = ({ selectedData, linePoints }) => {
                   const heightPercent = Math.min((value / maxBarLocal) * 100, 100);
                   return (
                     <div key={index} className="flex flex-col items-center justify-end h-full w-full">
-                      <div className="w-10 sm:w-14 bg-[#2b60aa] rounded-t-md transition-all duration-500 ease-in-out" style={{ height: `${heightPercent}%` }} title={`Value: ${value}`} />
+                      <div className="w-10 sm:w-14 bg-[#2b60aa] hover:bg-[#003f98] rounded-t-md transition-all duration-500 ease-in-out cursor-pointer relative group" style={{ height: `${heightPercent}%` }}>
+                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#00265d] text-white text-[12px] font-bold px-2.5 py-1 rounded shadow-md pointer-events-none whitespace-nowrap z-50">
+                          {value}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}

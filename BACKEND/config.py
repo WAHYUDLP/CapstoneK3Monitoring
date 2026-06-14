@@ -3,13 +3,13 @@
 DATABASE_URL = "mysql+pymysql://root:@localhost/k3_project"
 
 #ini punya yahya nanti diaktifin pas presentasi atau pas ketemu
-# TELEGRAM_TOKEN = "8707229189:AAEPf1wB8XJ3b-_HieOR23qsVBi85zBKiks"
-# TELEGRAM_CHAT_ID = "-1003886366274"
+TELEGRAM_TOKEN = "8707229189:AAEPf1wB8XJ3b-_HieOR23qsVBi85zBKiks"
+TELEGRAM_CHAT_ID = "-1003886366274"
 
 #ini aku nyoba sendiri mau test biar ngga ganggu yahya heheh
-# Token dari BotFather (Milik @NotifK3_bot)
-TELEGRAM_TOKEN  = "8541407692:AAFBxusrjfoDsU8fHxsb_tlKc6DfYGAs3C4" 
-TELEGRAM_CHAT_ID = "-1003870838631"
+# Token dari BotFather (Milik @NotifK3_bot) matiiiiiiiiiiiiiiiiiiiiiiii noooo botku ke delete
+# TELEGRAM_TOKEN  = "8541407692:AAFBxusrjfoDsU8fHxsb_tlKc6DfYGAs3C4" 
+# TELEGRAM_CHAT_ID = "-1003870838631"
 IMGBB_API_KEY = "158ee9e068a89b28e5b374a664a8e192"
 
 #punya hamzah 1
