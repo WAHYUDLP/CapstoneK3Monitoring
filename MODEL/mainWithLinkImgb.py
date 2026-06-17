@@ -180,7 +180,8 @@ last_violation_notification = {}
 recent_alert_locations = defaultdict(list)
 recent_violations = []
 
-def bbox_iou(box_a, box_b):
+def bbox_ioa(box_a, box_b):
+    # Calculates Intersection over Area of box_a (APD)
     ax1, ay1, ax2, ay2 = box_a
     bx1, by1, bx2, by2 = box_b
 
@@ -196,11 +197,9 @@ def bbox_iou(box_a, box_b):
         return 0.0
 
     area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
-    area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
-    union = area_a + area_b - inter_area
-    if union <= 0:
+    if area_a <= 0:
         return 0.0
-    return inter_area / union
+    return inter_area / area_a
 
 def bbox_center(box):
     x1, y1, x2, y2 = box
@@ -262,10 +261,11 @@ while cap.isOpened():
                         CONF_THRESHOLD = float(data.get("confidence_threshold", CONF_THRESHOLD))
                         PERSON_CONF_THRESHOLD = CONF_THRESHOLD
                         APD_CONF_THRESHOLD["mask"] = CONF_THRESHOLD
-                        APD_CONF_THRESHOLD["helmet"] = min(0.95, CONF_THRESHOLD * 2.0)
-                        APD_CONF_THRESHOLD["vest"] = min(0.95, CONF_THRESHOLD * 2.0)
+                        APD_CONF_THRESHOLD["helmet"] = CONF_THRESHOLD
+                        APD_CONF_THRESHOLD["vest"] = CONF_THRESHOLD
                         
-                        APD_PERSON_IOU_THRESHOLD = float(data.get("iou_threshold", APD_PERSON_IOU_THRESHOLD))
+                        # Use a low IoA threshold (0.05) to ensure even partial overlaps are counted
+                        APD_PERSON_IOU_THRESHOLD = 0.05
                         
                         min_frames = int(data.get("min_detection_frames", NEVER_WEAR_FRAMES))
                         NEVER_WEAR_FRAMES = min_frames
@@ -365,13 +365,13 @@ while cap.isOpened():
         apd_name = apd_item["name"]
         apd_box = apd_item["bbox"]
         best_person_id = None
-        best_iou = 0.0
+        best_ioa = 0.0
         for person_id, person_item in person_boxes.items():
-            iou = bbox_iou(apd_box, person_item["bbox"])
-            if iou > best_iou:
-                best_iou = iou
+            ioa = bbox_ioa(apd_box, person_item["bbox"])
+            if ioa > best_ioa:
+                best_ioa = ioa
                 best_person_id = person_id
-        if best_person_id is not None and best_iou >= APD_PERSON_IOU_THRESHOLD:
+        if best_person_id is not None and best_ioa >= APD_PERSON_IOU_THRESHOLD:
             detected_apd_per_person[best_person_id].add(apd_name)
 
     # =========================================================================
