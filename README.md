@@ -18,6 +18,12 @@ Sistem monitoring K3 (Keselamatan dan Kesehatan Kerja) yang menggabungkan deteks
 - FRONTEND/ - React + Vite UI
 - MODEL/ - model, weights, dan camera runner
 
+## Prasyarat (Prerequisites)
+Sebelum memulai, pastikan perangkat Anda sudah terinstal:
+- Python 3.9+
+- Node.js v18+ & npm
+- MySQL Server
+
 ## Quick Start (Windows)
 
 ### 1) Backend (FastAPI)
